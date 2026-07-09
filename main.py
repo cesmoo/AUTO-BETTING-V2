@@ -1,225 +1,282 @@
-import os
 import asyncio
-from telegram import Update, ReplyKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+import os
+import html
+from datetime import datetime
+from dotenv import load_dotenv
+from aiogram import Bot, Dispatcher, types, F
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.enums import ParseMode
+from aiogram.client.default import DefaultBotProperties
+from aiogram.types import FSInputFile, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from playwright.async_api import async_playwright
 
-# Conversation States များကို သတ်မှတ်ခြင်း
-CHOOSING_SITE, ENTERING_PHONE, ENTERING_PASSWORD = range(3)
+load_dotenv()
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+storage = MemoryStorage()
+dp = Dispatcher(storage=storage)
 
-# Render မှ Environment Variable ကို ရယူခြင်း
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+# ==========================================================
+# 🗂️ FSM States
+# ==========================================================
+class LoginForm(StatesGroup):
+    select_site = State()
+    enter_phone = State()
+    enter_password = State()
+    main_menu = State()
 
-# ---------------------------------------------------------
-# Playwright Automation Function
-# ---------------------------------------------------------
-async def run_playwright_login(phone, password):
-    """Playwright ဖြင့် နောက်ကွယ်မှ Chromium Browser ဖွင့်၍ Login ဝင်ခြင်း"""
-    browser = None
-    context = None
-    page = None
-    screenshot_path = "error_screenshot.png"
-    trace_path = "trace.zip"
+# ==========================================================
+# ⌨️ Keyboards
+# ==========================================================
+def get_main_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="🔐 Login")], [KeyboardButton(text="🎰 Games")]],
+        resize_keyboard=True
+    )
+
+def get_site_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="777BIGWIN")], [KeyboardButton(text="🔙 နောက်သို့")]],
+        resize_keyboard=True
+    )
+
+def get_logged_in_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📋 Info")], 
+            [KeyboardButton(text="🎰 Games")],
+            [KeyboardButton(text="🔐 Logout")]
+        ],
+        resize_keyboard=True
+    )
+
+# ==========================================================
+# 🤖 Command Handlers
+# ==========================================================
+@dp.message(Command("start"))
+async def cmd_start(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer("👋 <b>မင်္ဂလာပါ!</b>\nအကောင့်ဝင်ရန် Login ကိုနှိပ်ပါ။", reply_markup=get_main_keyboard())
+
+@dp.message(F.text == "🔐 Login")
+async def login_start(message: types.Message, state: FSMContext):
+    await state.set_state(LoginForm.select_site)
+    await message.answer("🌐 <b>Please select a site to login:</b>", reply_markup=get_site_keyboard())
+
+@dp.message(LoginForm.select_site)
+async def process_site(message: types.Message, state: FSMContext):
+    if message.text == "🔙 နောက်သို့":
+        await state.clear()
+        return await message.answer("Cancelled.", reply_markup=get_main_keyboard())
+    await state.update_data(site=message.text)
+    await state.set_state(LoginForm.enter_phone)
+    await message.answer("📞 <b>Please enter your phone:</b>", reply_markup=ReplyKeyboardRemove())
+
+@dp.message(LoginForm.enter_phone)
+async def process_phone(message: types.Message, state: FSMContext):
+    await state.update_data(phone=message.text)
+    await state.set_state(LoginForm.enter_password)
+    await message.answer("🔑 <b>Please enter your password:</b>", reply_markup=ReplyKeyboardRemove())
+
+# ==========================================================
+# 🔥 Playwright Logic: Robust Login + Data Scraping
+# ==========================================================
+@dp.message(LoginForm.enter_password)
+async def process_password(message: types.Message, state: FSMContext):
+    password = message.text
+    data = await state.get_data()
+    username = data.get('phone')
     
-    try:
-        async with async_playwright() as p:
-            # 1. Anti-bot များကို ကျော်လွှားနိုင်ရန် args အချို့ ထပ်ထည့်ခြင်း
-            browser = await p.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-blink-features=AutomationControlled", # Bot ဟု မပေါ်စေရန်
-                ]
-            ) 
-            
-            # 2. တကယ့် ဖုန်း/ကွန်ပျူတာ အစစ်အတိုင်းဖြစ်အောင် User Agent နှင့် Viewport ပြင်ဆင်ခြင်း
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 720},
-                device_scale_factor=1,
-                has_touch=False,
-                is_mobile=False,
-                locale="en-US",
-                timezone_id="Asia/Yangon"
-            )
-            
-            # Webdriver ကို ဖျောက်ခြင်း (Anti-bot ကျော်ရန်)
-            await context.add_init_script(
-                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-            )
-            
-            # 🔴 Debug အတွက် Tracing စတင်မှတ်တမ်းတင်ခြင်း
-            await context.tracing.start(screenshots=True, snapshots=True, sources=True)
-            
-            page = await context.new_page()
-            
-            # 3. Timeout ကို ၆၀ စက္ကန့်အထိ တိုးပေးထားခြင်း နှင့် Load ဖြစ်ချိန်စောင့်ခြင်း
-            print("🌐 Website သို့ သွားနေပါသည်...")
-            await page.goto("https://www.777bigwingame.app/#/login", timeout=60000, wait_until="domcontentloaded")
-            
-            # ခဏစောင့်ပေးခြင်း (SPA framework များ အလုပ်လုပ်ချိန်ရစေရန်)
+    loading_msg = await message.answer("🔄 <b>အကောင့်ဝင်နေပါသည်... ခဏစောင့်ပါ...</b>")
+    
+    async with async_playwright() as p:
+        # Docker တွင် အဆင်ပြေစေရန် args များ ထည့်သွင်းထားပါသည်
+        browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36", 
+            viewport={'width': 390, 'height': 844}, 
+            is_mobile=True
+        )
+        page = await context.new_page()
+        
+        try:
+            # ၁။ Login စာမျက်နှာသို့ သွားခြင်း
+            await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
             await page.wait_for_timeout(3000)
+
+            # ၂။ Vue.js Reactivity ကို ကျော်ဖြတ်၍ အချက်အလက်များ ထည့်သွင်းခြင်း
+            js_code = """
+            ([user, pwd]) => {
+                function fillVueInput(element, value) {
+                    if (!element) return false;
+                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeSetter.call(element, value);
+                    element.dispatchEvent(new Event('input', { bubbles: true }));
+                    element.dispatchEvent(new Event('change', { bubbles: true }));
+                    element.blur();
+                    return true;
+                }
+                
+                let phone = document.querySelector('input[name="userNumber"]');
+                fillVueInput(phone, user);
+                
+                let pass = document.querySelector('input[placeholder="စကားဝှက်"]') || 
+                           document.querySelector('input[placeholder="Password"]') || 
+                           document.querySelector('.passwordInput__container-input input');
+                fillVueInput(pass, pwd);
+            }
+            """
+            await page.evaluate(js_code, [username, password])
+            await page.wait_for_timeout(1000)
+
+            # ၃။ Login ခလုတ်ကို နှိပ်ခြင်း
+            await page.evaluate("""
+                () => {
+                    let btn = document.querySelector('button.active');
+                    if (btn) btn.click();
+                }
+            """)
             
-            # 4. Input Box ပေါ်လာသည်အထိ စောင့်ခြင်း (Timeout 30s)
-            print("⏳ Element ပေါ်လာရန် စောင့်နေပါသည်...")
-            await page.wait_for_selector('input[name="userNumber"]', state="visible", timeout=30000)
-            
-            print("✍️ Data များ ဖြည့်နေပါသည်...")
-            await page.locator('input[name="userNumber"]').fill(str(phone))
-            await page.locator('input[placeholder="Password"]').fill(str(password))
-            
-            print("🖱️ Login Button ကို နှိပ်နေပါသည်...")
-            await page.locator('div.signIn_container-button button.active').click()
-            
-            # Login အောင်မြင်မှုအတွက် ၅ စက္ကန့်ခန့် စောင့်ဆိုင်းခြင်း
             await page.wait_for_timeout(5000)
             
-            current_url = page.url
-            print(f"Post-Login URL: {current_url}")
-            
-            # အောင်မြင်သွားပါက Tracing ရပ်မည် (သိမ်းရန်မလိုပါ)
-            await context.tracing.stop()
-            await browser.close()
-            return True, "26.92", None, None
-            
-    except Exception as e:
-        error_msg = str(e)
-        print(f"Playwright Error: {error_msg}")
-        
-        # 🔴 Error တက်ပါက Screenshot နှင့် Trace File ကို သိမ်းဆည်းခြင်း
-        if page:
+            # Popup ပိတ်ခြင်း (လိုအပ်ပါက)
             try:
-                await page.screenshot(path=screenshot_path, full_page=True)
-                print("📸 Screenshot ရိုက်ယူပြီးပါပြီ။")
-            except Exception as pic_error:
-                print(f"Screenshot Error: {pic_error}")
-                screenshot_path = None
-                
-        if context:
-            try:
-                await context.tracing.stop(path=trace_path)
-                print("🗂️ Trace ဖိုင် သိမ်းဆည်းပြီးပါပြီ။")
-            except Exception as trace_error:
-                print(f"Trace Error: {trace_error}")
-                trace_path = None
-                
-        if browser:
-            await browser.close()
+                close_selector = ".announcement-dialog__button"
+                for _ in range(3):
+                    btn = await page.query_selector(close_selector)
+                    if btn:
+                        await btn.click()
+                        await page.wait_for_timeout(1000)
+                    else:
+                        break
+            except:
+                pass
             
-        return False, error_msg, screenshot_path, trace_path
-
-# ---------------------------------------------------------
-# Telegram Bot Handlers
-# ---------------------------------------------------------
-
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """/start ဟုရိုက်လျှင် ကြိုဆိုမည့် စာသား"""
-    welcome_text = (
-        "Welcome to Auto-Betting-Bot! 🤖\n\n"
-        "Login ဝင်ရန် /login (သို့မဟုတ်) Login ဟု ရိုက်ထည့်ပါ။"
-    )
-    await update.message.reply_text(welcome_text)
-
-async def start_login(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Login အစပြုသည့်အခါ Site ရွေးခိုင်းခြင်း"""
-    reply_keyboard = [["777BIGWIN"]]
-    await update.message.reply_text(
-        "Please select a site to login:",
-        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True),
-    )
-    return CHOOSING_SITE
-
-async def choose_site(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Site ရွေးပြီးပါက ဖုန်းနံပါတ် တောင်းခြင်း"""
-    site_choice = update.message.text
-    context.user_data['site'] = site_choice
-    await update.message.reply_text(f"You selected {site_choice}\n\n📱 Please enter your phone (or) email:")
-    return ENTERING_PHONE
-
-async def enter_phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """ဖုန်းနံပါတ်ရယူပြီး Password ဆက်တောင်းခြင်း"""
-    context.user_data['phone'] = update.message.text
-    await update.message.reply_text("🔒 Please enter your password:")
-    return ENTERING_PASSWORD
-
-async def enter_password(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Password ရယူပြီး Playwright ဖြင့် Login ဝင်ခြင်း"""
-    context.user_data['password'] = update.message.text
-    
-    phone = context.user_data['phone']
-    password = context.user_data['password']
-    site = context.user_data['site']
-
-    msg = await update.message.reply_text("⏳ Logging in via Playwright... Please wait.")
-
-    # Playwright Automation Function ကို ခေါ်ယူခြင်း
-    success, info, screenshot_path, trace_path = await run_playwright_login(phone, password)
-
-    if success:
-        success_message = (
-            "✅ *LOGIN SUCCESSFUL*\n"
-            "━━━━━━━━━━━━━━━\n"
-            f"🔹 *SITE:* {site}\n"
-            f"🔹 *USERNAME:* {phone}\n"
-            f"🔹 *BALANCE:* {info} Ks\n"
-        )
-        await msg.edit_text(success_message, parse_mode='Markdown')
-    else:
-        # Error Message ကို အကြောင်းကြားခြင်း
-        await msg.edit_text(f"❌ Login Failed!\n\n⚠️ Error: {info[:150]}...")
-        
-        # Screenshot ရှိပါက ပို့ပေးခြင်း
-        if screenshot_path and os.path.exists(screenshot_path):
-            with open(screenshot_path, 'rb') as photo:
-                await context.bot.send_photo(chat_id=update.effective_chat.id, photo=photo, caption="📸 နောက်ကွယ်တွင် Browser မြင်နေရသော ပုံ")
+            # ၄။ Login အောင်မြင်မှု စစ်ဆေးခြင်း
+            if "login" not in page.url.lower():
                 
-        # Trace File ရှိပါက ပို့ပေးခြင်း
-        if trace_path and os.path.exists(trace_path):
-            with open(trace_path, 'rb') as doc:
-                await context.bot.send_document(
-                    chat_id=update.effective_chat.id, 
-                    document=doc, 
-                    caption="🔍 Debug Trace ဖိုင်\n\n(ဒီဖိုင်ကို ဒေါင်းလုဒ်ဆွဲပြီး https://trace.playwright.dev တွင် ဖွင့်ကြည့်ပါ)"
+                # Info စာမျက်နှာ (#/main) သို့ တိုက်ရိုက်သွားရန်
+                try:
+                    await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
+                    await page.wait_for_timeout(3000)
+                except Exception as e:
+                    print(f"Info Page သို့ သွားရာတွင် Error: {e}")
+
+                # ၅။ DOM ထဲမှ Data များကို အတိအကျ ဆွဲထုတ်ခြင်း
+                user_id = "N/A"
+                nickname = "Unknown"
+                balance_text = "0.00 Ks"
+                site_login_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                try:
+                    nick_el = page.locator('.userInfo__container-content-nickname h3').first
+                    if await nick_el.is_visible(timeout=3000):
+                        nickname = await nick_el.inner_text()
+                    
+                    uid_el = page.locator('.userInfo__container-content-uid span:nth-child(3)').first
+                    if await uid_el.is_visible(timeout=2000):
+                        user_id = await uid_el.inner_text()
+                        
+                    balance_el = page.locator('.balance_info p.totalSavings__container-header__subtitle span').first
+                    if await balance_el.is_visible(timeout=2000):
+                        balance_text = await balance_el.inner_text()
+                        
+                    time_el = page.locator('.userInfo__container-content-logintime span:nth-child(2)').first
+                    if await time_el.is_visible(timeout=2000):
+                        site_login_time = await time_el.inner_text()
+
+                except Exception as e:
+                    print(f"Scraping Error: {e}")
+
+                # ၆။ State ထဲမှာ Data တွေကို သိမ်းဆည်းခြင်း
+                await state.update_data(
+                    is_logged_in=True,
+                    username=username,
+                    user_id=user_id.strip(),
+                    nickname=nickname.strip(),
+                    balance=balance_text.strip(),
+                    login_time=site_login_time.strip()
                 )
 
-    return ConversationHandler.END
+                await message.answer(
+                    "✅ <b>LOGIN SUCCESSFUL</b>\n\n"
+                    "သင့်အကောင့်အချက်အလက်များကို ကြည့်ရှုရန် အောက်ပါ <b>📋 Info</b> ခလုတ်ကို နှိပ်ပါ။",
+                    reply_markup=get_logged_in_keyboard()
+                )
+                await state.set_state(LoginForm.main_menu)
+                
+            else:
+                await message.answer("❌ <b>Login မအောင်မြင်ပါ။ စကားဝှက် မှားယွင်းနေနိုင်ပါသည်။</b>", reply_markup=get_main_keyboard())
+                await state.clear()
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    """Conversation ကို ရပ်တန့်ခြင်း"""
-    await update.message.reply_text("Process cancelled.")
-    return ConversationHandler.END
+            await loading_msg.delete()
 
-# ---------------------------------------------------------
-# Main Application
-# ---------------------------------------------------------
-def main():
-    if not TELEGRAM_BOT_TOKEN:
-        print("Error: TELEGRAM_BOT_TOKEN is missing!")
-        return
+        except Exception as e:
+            await message.answer(f"⚠️ <b>Error:</b> {html.escape(str(e))}", reply_markup=get_main_keyboard())
+            await state.clear()
+            await loading_msg.delete()
+        finally:
+            await browser.close()
 
-    # Application တည်ဆောက်ခြင်း
-    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-
-    # /start command အတွက် Handler ထည့်ခြင်း
-    application.add_handler(CommandHandler("start", start_command))
-
-    # Login အတွက် Conversation Handler တည်ဆောက်ခြင်း
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("login", start_login), MessageHandler(filters.Regex("(?i)^Login$"), start_login)],
-        states={
-            CHOOSING_SITE: [MessageHandler(filters.TEXT & ~filters.COMMAND, choose_site)],
-            ENTERING_PHONE: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_phone)],
-            ENTERING_PASSWORD: [MessageHandler(filters.TEXT & ~filters.COMMAND, enter_password)],
-        },
-        fallbacks=[CommandHandler("cancel", cancel)],
-    )
-    application.add_handler(conv_handler)
+# ==========================================================
+# 📋 Info Button (State ထဲက Data ပြသရန်)
+# ==========================================================
+@dp.message(LoginForm.main_menu, F.text == "📋 Info")
+async def show_info(message: types.Message, state: FSMContext):
+    data = await state.get_data()
     
-    # Bot အား Polling ဖြင့် စတင် Run ခြင်း
-    print("🤖 Bot is starting via Polling...")
-    application.run_polling(allowed_updates=Update.ALL_TYPES)
+    user_id = data.get('user_id', 'N/A')
+    username = data.get('username', 'N/A')
+    nickname = data.get('nickname', 'Unknown')
+    balance = data.get('balance', '0.00 Ks')
+    login_time = data.get('login_time', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-if __name__ == "__main__":
-    main()
+    info_text = (
+        "👤 <b>User Information:</b>\n"
+        "├─ 🆔 <b>User ID:</b> {user_id}\n"
+        "├─ 📱 <b>Username:</b> {username}\n"
+        "├─ 🏷️ <b>Nickname:</b> {nickname}\n"
+        "├─ 💰 <b>Balance:</b> {balance}\n"
+        "├─ 📅 <b>Login Date:</b> {login_time}\n"
+        "└─ ✅ <b>Allow Withdraw:</b> Yes\n"
+    ).format(
+        user_id=user_id, 
+        username=username, 
+        nickname=nickname, 
+        balance=balance, 
+        login_time=login_time
+    )
+    
+    await message.answer(info_text, reply_markup=get_logged_in_keyboard())
+
+# ==========================================================
+# 🔐 Logout
+# ==========================================================
+@dp.message(LoginForm.main_menu, F.text == "🔐 Logout")
+async def logout(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer("👋 အကောင့်ထွက်ပြီးပါပြီ။", reply_markup=get_main_keyboard())
+
+# ==========================================================
+# 🎰 Games
+# ==========================================================
+@dp.message(F.text == "🎰 Games")
+async def games(message: types.Message):
+    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>\n(ဤအပိုင်းကို နောက်ပိုင်းတွင် ထပ်မံဖြည့်စွက်နိုင်ပါသည်)", reply_markup=get_main_keyboard())
+
+# ==========================================================
+# 🚀 Main Bot Loop
+# ==========================================================
+async def main():
+    print("🚀 Auto-Bet v2 Bot စတင်နေပါပြီ...")
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
+
+if __name__ == '__main__':
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot ကို ရပ်တန့်လိုက်ပါသည်။")
