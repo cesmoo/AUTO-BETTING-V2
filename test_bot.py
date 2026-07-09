@@ -23,51 +23,35 @@ class LoginForm(StatesGroup):
     select_site = State()
     enter_phone = State()
     enter_password = State()
-    main_menu = State() # Login ပြီးသွားရင် ဒီ State ကိုရောက်မယ်
+    main_menu = State()
 
-# ==========================================
-# Custom Keyboards
-# ==========================================
 def get_main_keyboard():
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🔐 Login")],
-            [KeyboardButton(text="🎰 Games")]
-        ],
+        keyboard=[[KeyboardButton(text="🔐 Login")], [KeyboardButton(text="🎰 Games")]],
         resize_keyboard=True
     )
 
 def get_site_keyboard():
     return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="777BIGWIN")],
-            [KeyboardButton(text="🔙 နောက်သို့")]
-        ],
+        keyboard=[[KeyboardButton(text="777BIGWIN")], [KeyboardButton(text="🔙 နောက်သို့")]],
         resize_keyboard=True
     )
 
-# 🔥 Login ပြီးသွားရင် ဒီ Keyboard ပေါ်လာမယ်
 def get_logged_in_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📋 Info")],      # ဒီခလုတ်ကို နှိပ်မှ Data ပြမယ်
+            [KeyboardButton(text="📋 Info")], 
             [KeyboardButton(text="🎰 Games")],
             [KeyboardButton(text="🔐 Logout")]
         ],
         resize_keyboard=True
     )
 
-# ==========================================
-# Command Handlers
-# ==========================================
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("👋 <b>မင်္ဂလာပါ!</b>\nအကောင့်ဝင်ရန် Login ကိုနှိပ်ပါ။", reply_markup=get_main_keyboard())
 
-# ==========================================
-# Login Flow
-# ==========================================
 @dp.message(F.text == "🔐 Login")
 async def login_start(message: types.Message, state: FSMContext):
     await state.set_state(LoginForm.select_site)
@@ -78,7 +62,6 @@ async def process_site(message: types.Message, state: FSMContext):
     if message.text == "🔙 နောက်သို့":
         await state.clear()
         return await message.answer("Cancelled.", reply_markup=get_main_keyboard())
-    
     await state.update_data(site=message.text)
     await state.set_state(LoginForm.enter_phone)
     await message.answer("📞 <b>Please enter your phone:</b>", reply_markup=ReplyKeyboardRemove())
@@ -89,15 +72,14 @@ async def process_phone(message: types.Message, state: FSMContext):
     await state.set_state(LoginForm.enter_password)
     await message.answer("🔑 <b>Please enter your password:</b>", reply_markup=ReplyKeyboardRemove())
 
-# ==========================================
-# Playwright Logic (Login စစ်ဆေးရုံပဲ)
-# ==========================================
+# ==========================================================
+# 🔥 Playwright Logic: Login + Data Scraping & Save to State
+# ==========================================================
 @dp.message(LoginForm.enter_password)
 async def process_password(message: types.Message, state: FSMContext):
     password = message.text
     data = await state.get_data()
     username = data.get('phone')
-    site = data.get('site')
     
     loading_msg = await message.answer("🔄 <b>အကောင့်ဝင်နေပါသည်... ခဏစောင့်ပါ...</b>")
     
@@ -127,9 +109,10 @@ async def process_password(message: types.Message, state: FSMContext):
                 }
             """)
             
+            # Data များ Load ရန် စောင့်ခြင်း
             await page.wait_for_timeout(8000)
-
-            # Popup ရှိရင် ပိတ်မယ် (ပုံထဲကအတိုင်း)
+            
+            # Popup ပိတ်ခြင်း
             try:
                 close_selector = ".announcement-dialog__button"
                 for _ in range(5):
@@ -139,23 +122,51 @@ async def process_password(message: types.Message, state: FSMContext):
                         await page.wait_for_timeout(1000)
                     else:
                         break
+                await page.wait_for_timeout(2000)
             except:
                 pass
             
-            # URL စစ်ဆေးခြင်း
             if "login" not in page.url.lower():
-                # ✅ Login အောင်မြင်ကြောင်းပဲ ပြီး Data မပြဘူး
-                await message.answer(
-                    "✅ <b>LOGIN SUCCESSFUL</b>\n\n"
-                    "သင့်အကောင့်အချက်အလက်များကို ကြည့်ရှုရန် အောက်ပါ <b>📋 Info</b> ခလုတ်ကို နှိပ်ပါ။",
-                    reply_markup=get_logged_in_keyboard()
-                )
                 
-                # 🔥 Data တွေကို State ထဲမှာ သိမ်းထားမယ်
+                # ==========================================================
+                # 🔥 ဒီနေရာမှာ Data တွေကို DOM ထဲကနေ ဆွဲထုတ်ပြီး State ထဲ သိမ်းမယ်
+                # ==========================================================
+                user_id = "N/A"
+                nickname = "Unknown"
+                balance_text = "0.00 Ks"
+                site_login_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                try:
+                    # Selector တွေကို သင့်ရဲ့ DOM Screenshot အတိုင်း ထားပေးထားပါတယ်
+                    uid_el = await page.query_selector('.userInfo__container-content-uid > span:nth-child(3)')
+                    if uid_el: user_id = await uid_el.inner_text()
+
+                    nickname_el = await page.query_selector('.userInfo__container-content-nickname h3')
+                    if nickname_el: nickname = await nickname_el.inner_text()
+                    
+                    balance_el = await page.query_selector('.totalSavings__container-header-box .balance_info p span')
+                    if balance_el: balance_text = await balance_el.inner_text()
+                    
+                    logintime_el = await page.query_selector('.userInfo__container-content-logintime > span:nth-child(2)')
+                    if logintime_el: site_login_time = await logintime_el.inner_text()
+
+                except Exception as e:
+                    print(f"Scraping Error: {e}")
+
+                # ✅ State ထဲမှာ Data တွေကို သိမ်းဆည်းလိုက်တယ်
                 await state.update_data(
                     is_logged_in=True,
                     username=username,
-                    site=site
+                    user_id=user_id.strip(),
+                    nickname=nickname.strip(),
+                    balance=balance_text.strip(),
+                    login_time=site_login_time.strip()
+                )
+
+                await message.answer(
+                    "✅ <b>LOGIN SUCCESSFUL</b>\n\n"
+                    "သင့်အကောင့်အချက်အလက်များကို ကြည့်ရှုရန် အောက်ပါ <b>📋 Info</b> ခလုတ်ကို နှိပ်ပါ။",
+                    reply_markup=get_logged_in_keyboard()
                 )
                 await state.set_state(LoginForm.main_menu)
                 
@@ -172,33 +183,37 @@ async def process_password(message: types.Message, state: FSMContext):
         finally:
             await browser.close()
 
-# ==========================================
-# 📋 Info Button (ဒီခလုတ်နှိပ်မှ Data တွေပြမယ်)
-# ==========================================
+# ==========================================================
+# 📋 Info Button (State ထဲက သိမ်းထားတဲ့ Data တွေကို ပြမယ်)
+# ==========================================================
 @dp.message(LoginForm.main_menu, F.text == "📋 Info")
 async def show_info(message: types.Message, state: FSMContext):
     data = await state.get_data()
     
-    # State ထဲက Data တွေကို ထုတ်ယူမယ်
+    user_id = data.get('user_id', '')
     username = data.get('username', 'N/A')
-    site = data.get('site', 'N/A')
-    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    nickname = data.get('nickname', '')
+    balance = data.get('balance', '0.00 Ks')
+    login_time = data.get('login_time', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     info_text = (
         "👤 <b>User Information:</b>\n"
-        "├─ 🆔 <b>User ID:</b> \n"
+        "├─ 🆔 <b>User ID:</b> {user_id}\n"
         "├─ 📱 <b>Username:</b> {username}\n"
-        "├─ 🏷️ <b>Nickname:</b> \n"
-        "├─ 💰 <b>Balance:</b> 0.00 Ks\n"
-        "├─ 📅 <b>Login Date:</b> {current_time}\n"
+        "├─ 🏷️ <b>Nickname:</b> {nickname}\n"
+        "├─ 💰 <b>Balance:</b> {balance}\n"
+        "├─ 📅 <b>Login Date:</b> {login_time}\n"
         "└─ ✅ <b>Allow Withdraw:</b> Yes\n"
-    ).format(username=username, current_time=current_time)
+    ).format(
+        user_id=user_id, 
+        username=username, 
+        nickname=nickname, 
+        balance=balance, 
+        login_time=login_time
+    )
     
     await message.answer(info_text, reply_markup=get_logged_in_keyboard())
 
-# ==========================================
-# Logout / Games
-# ==========================================
 @dp.message(LoginForm.main_menu, F.text == "🔐 Logout")
 async def logout(message: types.Message, state: FSMContext):
     await state.clear()
@@ -206,11 +221,8 @@ async def logout(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "🎰 Games")
 async def games(message: types.Message):
-    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>\n(နောက်ပိုင်း ဒီနေရာမှာ Game Logic ထည့်သွင်းသွားမှာပါ)", reply_markup=get_main_keyboard())
+    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>", reply_markup=get_main_keyboard())
 
-# ==========================================
-# Main
-# ==========================================
 async def main():
     await dp.start_polling(bot)
 
