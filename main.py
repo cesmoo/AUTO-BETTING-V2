@@ -8,7 +8,7 @@ from playwright.async_api import async_playwright
 CHOOSING_SITE, ENTERING_PHONE, ENTERING_PASSWORD = range(3)
 
 # Environment Variables မှ Data များယူခြင်း
-TELEGRAM_BOT_TOKEN = os.getenv("8980067569:AAHNbSc7W46a0sO4OMg5PRWJ_P-54K74_rA")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 # ---------------------------------------------------------
 # Playwright Automation Function
