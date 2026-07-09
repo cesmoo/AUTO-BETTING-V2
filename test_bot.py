@@ -28,7 +28,7 @@ async def start_login_test(message: types.Message):
     if len(parts) != 3:
         return await message.reply(
             "⚠️ ပုံစံမှားယွင်းနေပါသည်။ ကျေးဇူးပြု၍ အောက်ပါအတိုင်း ရိုက်ထည့်ပါ။\n\n"
-            "<code>/testlogin ဖုန်းနံပါတ် Password</code>"
+            "<code>/testlogin 09680090540 Mitheint11</code>"
         )
         
     username = parts[1]
@@ -37,10 +37,10 @@ async def start_login_test(message: types.Message):
     asyncio.create_task(run_playwright_login(message, username, password))
 
 # ==========================================
-# 🤖 3. PLAYWRIGHT LOGIN LOGIC (FIXED)
+# 🤖 3. PLAYWRIGHT LOGIN LOGIC (BURMESE UI FIX)
 # ==========================================
 async def run_playwright_login(message: types.Message, username, password):
-    status_msg = await message.reply("🔄 <b>Browser ဖွင့်၍ Login စမ်းသပ်နေပါသည်...</b>")
+    status_msg = await message.reply("🔄 <b>Browser ဖွင့်၍ မြန်မာ UI ဖြင့် Login စမ်းသပ်နေပါသည်...</b>")
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -59,10 +59,10 @@ async def run_playwright_login(message: types.Message, username, password):
 
             await status_msg.edit_text("📱 <b>အချက်အလက်များ ရိုက်ထည့်နေပါသည်...</b>")
             
-            # 🔧 ဤနေရာတွင် ဘာသာစကားမရွေး အလုပ်လုပ်သော CSS Class ကို အသုံးပြု၍ 
-            # Vue.js အား အတင်းအကျပ် အသိအမှတ်ပြုခိုင်းသော နည်းလမ်းကို သုံးထားပါသည်။
+            # 🔧 ညီကိုပို့ပေးထားသော Screenshot မှ မြန်မာစာ Tag များကို အတိအကျ အသုံးပြုထားပါသည်
             native_js = f"""
                 function setNativeValue(element, value) {{
+                    if (!element) return;
                     const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
                     const prototype = Object.getPrototypeOf(element);
                     const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
@@ -76,27 +76,29 @@ async def run_playwright_login(message: types.Message, username, password):
                     element.dispatchEvent(new Event('change', {{ bubbles: true }}));
                 }}
 
-                // ဖုန်းနံပါတ် (Language Independent)
+                // ဖုန်းနံပါတ် 
                 let phone = document.querySelector('input[name="userNumber"]');
-                if (phone) setNativeValue(phone, '{username}');
+                setNativeValue(phone, '{username}');
 
-                // Password (Language Independent - Class ကိုသာ အသုံးပြုထားသည်)
-                let pwd = document.querySelector('.passwordInput__container-input input');
-                if (pwd) setNativeValue(pwd, '{password}');
+                // Password (စကားဝှက် ဟု အတိအကျ ဖမ်းထားသည်)
+                let pwd = document.querySelector('input[placeholder="စကားဝှက်"]');
+                setNativeValue(pwd, '{password}');
             """
             
             await page.evaluate(native_js)
             await page.wait_for_timeout(1000)
 
-            await status_msg.edit_text("🖱️ <b>Login ခလုတ်ကို နှိပ်နေပါသည်...</b>")
-            # ခလုတ်ကိုလည်း ဘာသာစကားမရွေး နှိပ်နိုင်ရန် ပြင်ဆင်ထားသည်
+            await status_msg.edit_text("🖱️ <b>'လော့ဂ်အင်' ခလုတ်ကို နှိပ်နေပါသည်...</b>")
+            
+            # ခလုတ်ကိုလည်း မြန်မာလို 'လော့ဂ်အင်' ကိုရှာပြီး နှိပ်ခိုင်းပါမည်
             await page.evaluate("""
-                let btn = document.querySelector('.signIn__container-button');
-                if (btn) btn.click();
-                
-                // Fallback အတွက် Button အတိအကျကို ထပ်ရှာ၍နှိပ်မည်
-                let innerBtn = document.querySelector('.signIn__container-button button.active');
-                if (innerBtn) innerBtn.click();
+                let buttons = document.querySelectorAll('button.active');
+                for (let btn of buttons) {
+                    if (btn.innerText.includes('လော့ဂ်အင်')) {
+                        btn.click();
+                        break;
+                    }
+                }
             """)
             
             await status_msg.edit_text("⏳ <b>ဝင်သွားရန် ၅ စက္ကန့် စောင့်နေပါသည်...</b>")
@@ -117,9 +119,9 @@ async def run_playwright_login(message: types.Message, username, password):
         except Exception as e:
             await message.reply(f"⚠️ <b>Error ဖြစ်သွားပါသည်:</b> {e}")
             await page.screenshot(path="test_error.png")
-            photo = FSInputFile("test_error.png")
-            await bot.send_photo(message.chat.id, photo, caption="📸 Error တက်သွားသော မျက်နှာပြင်")
             if os.path.exists("test_error.png"):
+                photo = FSInputFile("test_error.png")
+                await bot.send_photo(message.chat.id, photo, caption="📸 Error တက်သွားသော မျက်နှာပြင်")
                 os.remove("test_error.png")
             
         finally:
