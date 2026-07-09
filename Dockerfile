@@ -1,19 +1,19 @@
-# Playwright မှ တရားဝင် ထုတ်ထားသော Ubuntu Jammy (Python) Base Image ကို အသုံးပြုခြင်း
-FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
+# Playwright ကို အထောက်အပံ့ပေးသည့် Official Python Image ကို အသုံးပြုပါမည် (Ubuntu Jammy အခြေခံ)
+FROM mcr.microsoft.com/playwright/python:v1.44.0-jammy
 
-# Working Directory သတ်မှတ်ခြင်း
+# လုပ်ငန်းဆောင်ရွက်မည့် Directory ကို သတ်မှတ်ခြင်း
 WORKDIR /app
 
-# Requirements များ Copy ကူးပြီး Install လုပ်ခြင်း
+# Requirements ဖိုင်ကို အရင် copy ကူးပြီး install လုပ်ခြင်း
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Official image တွင် dependencies များ ပါဝင်ပြီးဖြစ်၍ install-deps လုပ်ရန် မလိုတော့ပါ
-# Chromium ကိုသာ သေချာစေရန် ထပ်မံသွင်းပါမည်
-RUN playwright install chromium
+# 🔧 Chromium Browser နှင့် ၎င်း၏ လိုအပ်သော Dependencies များကို သွင်းခြင်း
+RUN python -m playwright install chromium
+RUN python -m playwright install-deps chromium
 
-# ကျန်ရှိသော Code များကို Copy ကူးခြင်း
+# Code ဖိုင်အားလုံးကို Docker Container ထဲသို့ Copy ကူးခြင်း
 COPY . .
 
-# Bot ကို စတင် Run မည်
-CMD ["python", "main.py"]
+# Bot ကို စတင် Run ရန် Command
+CMD ["python", "test_bot.py"]
