@@ -16,4 +16,4 @@ RUN python -m playwright install-deps chromium
 COPY . .
 
 # Bot ကို စတင် Run ရန် Command
-CMD ["python", "test_bot.py"]
+CMD ["python", "main.py"]
