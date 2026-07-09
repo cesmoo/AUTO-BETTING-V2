@@ -367,7 +367,7 @@ async def run_betting_loop(message, status_msg, username, password, bet_sequence
                 if bet_success:
                     await message.answer(f"🎲 {display_type} သို့ <b>{current_amount} ကျပ်</b> လောင်းထားပါသည်။ (အဆင့် {current_step+1})\n⏳ ရလဒ်ကို စောင့်နေပါသည်...")
                     
-                    await asyncio.sleep(50) # ရလဒ်ထွက်ရန် စောင့်ဆိုင်းချိန် (စက္ကန့် ၅၀)
+                    await asyncio.sleep(30) # ရလဒ်ထွက်ရန် စောင့်ဆိုင်းချိန် (စက္ကန့် ၅၀)
                     
                     is_win = await check_win_status(page)
                     
