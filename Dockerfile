@@ -1,19 +1,19 @@
-FROM python:3.10-slim
+# Playwright မှ တရားဝင် ထုတ်ထားသော Ubuntu Jammy (Python) Base Image ကို အသုံးပြုခြင်း
+FROM mcr.microsoft.com/playwright/python:v1.42.0-jammy
 
-RUN apt-get update && apt-get install -y \
-    wget \
-    gnupg \
-    && rm -rf /var/lib/apt/lists/*
-
+# Working Directory သတ်မှတ်ခြင်း
 WORKDIR /app
 
+# Requirements များ Copy ကူးပြီး Install လုပ်ခြင်း
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Official image တွင် dependencies များ ပါဝင်ပြီးဖြစ်၍ install-deps လုပ်ရန် မလိုတော့ပါ
+# Chromium ကိုသာ သေချာစေရန် ထပ်မံသွင်းပါမည်
 RUN playwright install chromium
-RUN playwright install-deps chromium
 
+# ကျန်ရှိသော Code များကို Copy ကူးခြင်း
 COPY . .
 
-# Web Service မဟုတ်သောကြောင့် Python file ကို တိုက်ရိုက် Run ပါမည်
+# Bot ကို စတင် Run မည်
 CMD ["python", "main.py"]
