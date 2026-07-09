@@ -19,12 +19,18 @@ bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTM
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
+# ==========================================================
+# 🗂️ FSM States
+# ==========================================================
 class LoginForm(StatesGroup):
     select_site = State()
     enter_phone = State()
     enter_password = State()
     main_menu = State()
 
+# ==========================================================
+# ⌨️ Keyboards
+# ==========================================================
 def get_main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="🔐 Login")], [KeyboardButton(text="🎰 Games")]],
@@ -47,6 +53,9 @@ def get_logged_in_keyboard():
         resize_keyboard=True
     )
 
+# ==========================================================
+# 🤖 Command Handlers
+# ==========================================================
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
@@ -73,7 +82,7 @@ async def process_phone(message: types.Message, state: FSMContext):
     await message.answer("🔑 <b>Please enter your password:</b>", reply_markup=ReplyKeyboardRemove())
 
 # ==========================================================
-# 🔥 Playwright Logic: Login + Data Scraping & Save to State
+# 🔥 Playwright Logic: Robust Login + Data Scraping
 # ==========================================================
 @dp.message(LoginForm.enter_password)
 async def process_password(message: types.Message, state: FSMContext):
@@ -84,6 +93,7 @@ async def process_password(message: types.Message, state: FSMContext):
     loading_msg = await message.answer("🔄 <b>အကောင့်ဝင်နေပါသည်... ခဏစောင့်ပါ...</b>")
     
     async with async_playwright() as p:
+        # Docker တွင် အဆင်ပြေစေရန် args များ ထည့်သွင်းထားပါသည်
         browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
         context = await browser.new_context(
             user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36", 
@@ -93,67 +103,95 @@ async def process_password(message: types.Message, state: FSMContext):
         page = await context.new_page()
         
         try:
+            # ၁။ Login စာမျက်နှာသို့ သွားခြင်း
             await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
-            await page.wait_for_timeout(2000)
+            await page.wait_for_timeout(3000)
 
-            await page.fill('input[name="userNumber"]', username)
-            password_input = await page.query_selector('input[placeholder="စကားဝှက်"], input[placeholder="Password"]')
-            if password_input:
-                await password_input.fill(password)
-            
-            await page.wait_for_timeout(2000)
+            # ၂။ Vue.js Reactivity ကို ကျော်ဖြတ်၍ အချက်အလက်များ ထည့်သွင်းခြင်း
+            js_code = """
+            ([user, pwd]) => {
+                function fillVueInput(element, value) {
+                    if (!element) return false;
+                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeSetter.call(element, value);
+                    element.dispatchEvent(new Event('input', { bubbles: true }));
+                    element.dispatchEvent(new Event('change', { bubbles: true }));
+                    element.blur();
+                    return true;
+                }
+                
+                let phone = document.querySelector('input[name="userNumber"]');
+                fillVueInput(phone, user);
+                
+                let pass = document.querySelector('input[placeholder="စကားဝှက်"]') || 
+                           document.querySelector('input[placeholder="Password"]') || 
+                           document.querySelector('.passwordInput__container-input input');
+                fillVueInput(pass, pwd);
+            }
+            """
+            await page.evaluate(js_code, [username, password])
+            await page.wait_for_timeout(1000)
+
+            # ၃။ Login ခလုတ်ကို နှိပ်ခြင်း
             await page.evaluate("""
                 () => {
-                    let btn = document.querySelector('button.active') || document.querySelector('button[type="submit"]');
+                    let btn = document.querySelector('button.active');
                     if (btn) btn.click();
                 }
             """)
             
-            # Data များ Load ရန် စောင့်ခြင်း
-            await page.wait_for_timeout(8000)
+            await page.wait_for_timeout(5000)
             
-            # Popup ပိတ်ခြင်း
+            # Popup ပိတ်ခြင်း (လိုအပ်ပါက)
             try:
                 close_selector = ".announcement-dialog__button"
-                for _ in range(5):
+                for _ in range(3):
                     btn = await page.query_selector(close_selector)
                     if btn:
                         await btn.click()
                         await page.wait_for_timeout(1000)
                     else:
                         break
-                await page.wait_for_timeout(2000)
             except:
                 pass
             
+            # ၄။ Login အောင်မြင်မှု စစ်ဆေးခြင်း
             if "login" not in page.url.lower():
                 
-                # ==========================================================
-                # 🔥 ဒီနေရာမှာ Data တွေကို DOM ထဲကနေ ဆွဲထုတ်ပြီး State ထဲ သိမ်းမယ်
-                # ==========================================================
+                # Info စာမျက်နှာ (#/main) သို့ တိုက်ရိုက်သွားရန်
+                try:
+                    await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
+                    await page.wait_for_timeout(3000)
+                except Exception as e:
+                    print(f"Info Page သို့ သွားရာတွင် Error: {e}")
+
+                # ၅။ DOM ထဲမှ Data များကို အတိအကျ ဆွဲထုတ်ခြင်း
                 user_id = "N/A"
                 nickname = "Unknown"
                 balance_text = "0.00 Ks"
                 site_login_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 try:
-                    # Selector တွေကို သင့်ရဲ့ DOM Screenshot အတိုင်း ထားပေးထားပါတယ်
-                    uid_el = await page.query_selector('.userInfo__container-content-uid > span:nth-child(3)')
-                    if uid_el: user_id = await uid_el.inner_text()
-
-                    nickname_el = await page.query_selector('.userInfo__container-content-nickname h3')
-                    if nickname_el: nickname = await nickname_el.inner_text()
+                    nick_el = page.locator('.userInfo__container-content-nickname h3').first
+                    if await nick_el.is_visible(timeout=3000):
+                        nickname = await nick_el.inner_text()
                     
-                    balance_el = await page.query_selector('.totalSavings__container-header-box .balance_info p span')
-                    if balance_el: balance_text = await balance_el.inner_text()
-                    
-                    logintime_el = await page.query_selector('.userInfo__container-content-logintime > span:nth-child(2)')
-                    if logintime_el: site_login_time = await logintime_el.inner_text()
+                    uid_el = page.locator('.userInfo__container-content-uid span:nth-child(3)').first
+                    if await uid_el.is_visible(timeout=2000):
+                        user_id = await uid_el.inner_text()
+                        
+                    balance_el = page.locator('.balance_info p.totalSavings__container-header__subtitle span').first
+                    if await balance_el.is_visible(timeout=2000):
+                        balance_text = await balance_el.inner_text()
+                        
+                    time_el = page.locator('.userInfo__container-content-logintime span:nth-child(2)').first
+                    if await time_el.is_visible(timeout=2000):
+                        site_login_time = await time_el.inner_text()
 
                 except Exception as e:
                     print(f"Scraping Error: {e}")
 
-                # ✅ State ထဲမှာ Data တွေကို သိမ်းဆည်းလိုက်တယ်
+                # ၆။ State ထဲမှာ Data တွေကို သိမ်းဆည်းခြင်း
                 await state.update_data(
                     is_logged_in=True,
                     username=username,
@@ -171,28 +209,28 @@ async def process_password(message: types.Message, state: FSMContext):
                 await state.set_state(LoginForm.main_menu)
                 
             else:
-                await message.answer("❌ <b>Login မအောင်မြင်ပါ။</b>", reply_markup=get_main_keyboard())
+                await message.answer("❌ <b>Login မအောင်မြင်ပါ။ စကားဝှက် မှားယွင်းနေနိုင်ပါသည်။</b>", reply_markup=get_main_keyboard())
                 await state.clear()
 
             await loading_msg.delete()
 
         except Exception as e:
-            await message.answer(f"⚠️ Error: {html.escape(str(e))}", reply_markup=get_main_keyboard())
+            await message.answer(f"⚠️ <b>Error:</b> {html.escape(str(e))}", reply_markup=get_main_keyboard())
             await state.clear()
             await loading_msg.delete()
         finally:
             await browser.close()
 
 # ==========================================================
-# 📋 Info Button (State ထဲက သိမ်းထားတဲ့ Data တွေကို ပြမယ်)
+# 📋 Info Button (State ထဲက Data ပြသရန်)
 # ==========================================================
 @dp.message(LoginForm.main_menu, F.text == "📋 Info")
 async def show_info(message: types.Message, state: FSMContext):
     data = await state.get_data()
     
-    user_id = data.get('user_id', '')
+    user_id = data.get('user_id', 'N/A')
     username = data.get('username', 'N/A')
-    nickname = data.get('nickname', '')
+    nickname = data.get('nickname', 'Unknown')
     balance = data.get('balance', '0.00 Ks')
     login_time = data.get('login_time', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
@@ -214,17 +252,31 @@ async def show_info(message: types.Message, state: FSMContext):
     
     await message.answer(info_text, reply_markup=get_logged_in_keyboard())
 
+# ==========================================================
+# 🔐 Logout
+# ==========================================================
 @dp.message(LoginForm.main_menu, F.text == "🔐 Logout")
 async def logout(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("👋 အကောင့်ထွက်ပြီးပါပြီ။", reply_markup=get_main_keyboard())
 
+# ==========================================================
+# 🎰 Games
+# ==========================================================
 @dp.message(F.text == "🎰 Games")
 async def games(message: types.Message):
-    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>", reply_markup=get_main_keyboard())
+    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>\n(ဤအပိုင်းကို နောက်ပိုင်းတွင် ထပ်မံဖြည့်စွက်နိုင်ပါသည်)", reply_markup=get_main_keyboard())
 
+# ==========================================================
+# 🚀 Main Bot Loop
+# ==========================================================
 async def main():
+    print("🚀 Auto-Bet v2 Bot စတင်နေပါပြီ...")
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == '__main__':
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot ကို ရပ်တန့်လိုက်ပါသည်။")
