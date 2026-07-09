@@ -13,7 +13,6 @@ load_dotenv()
 # ==========================================
 # ⚙️ 1. CONFIGURATION
 # ==========================================
-# .env ဖိုင်ထဲတွင် BOT_TOKEN ကို ထည့်ထားပေးရန် လိုအပ်ပါသည်
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -24,24 +23,21 @@ dp = Dispatcher()
 # ==========================================
 @dp.message(Command("testlogin"))
 async def start_login_test(message: types.Message):
-    # Command ပုံစံ: /testlogin 09680090540 Mitheint11
     parts = message.text.strip().split()
     
     if len(parts) != 3:
         return await message.reply(
             "⚠️ ပုံစံမှားယွင်းနေပါသည်။ ကျေးဇူးပြု၍ အောက်ပါအတိုင်း ရိုက်ထည့်ပါ။\n\n"
-            "<code>/testlogin ဖုန်းနံပါတ် Password</code>\n\n"
-            "ဥပမာ - <code>/testlogin 09680090540 Mitheint11</code>"
+            "<code>/testlogin ဖုန်းနံပါတ် Password</code>"
         )
         
     username = parts[1]
     password = parts[2]
     
-    # နောက်ကွယ်မှ Playwright ကို စတင် Run မည်
     asyncio.create_task(run_playwright_login(message, username, password))
 
 # ==========================================
-# 🤖 3. PLAYWRIGHT LOGIN LOGIC
+# 🤖 3. PLAYWRIGHT LOGIN LOGIC (FIXED)
 # ==========================================
 async def run_playwright_login(message: types.Message, username, password):
     status_msg = await message.reply("🔄 <b>Browser ဖွင့်၍ Login စမ်းသပ်နေပါသည်...</b>")
@@ -61,30 +57,51 @@ async def run_playwright_login(message: types.Message, username, password):
             await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle")
             await page.wait_for_timeout(3000)
 
-            await status_msg.edit_text("📱 <b>ဖုန်းနံပါတ် ရိုက်ထည့်နေပါသည်...</b>")
-            phone_input = page.locator('input[name="userNumber"]')
-            await phone_input.click()
-            await phone_input.clear()
-            await phone_input.press_sequentially(username, delay=150)
-            await page.wait_for_timeout(500)
+            await status_msg.edit_text("📱 <b>အချက်အလက်များ ရိုက်ထည့်နေပါသည်...</b>")
+            
+            # 🔧 ဤနေရာတွင် ဘာသာစကားမရွေး အလုပ်လုပ်သော CSS Class ကို အသုံးပြု၍ 
+            # Vue.js အား အတင်းအကျပ် အသိအမှတ်ပြုခိုင်းသော နည်းလမ်းကို သုံးထားပါသည်။
+            native_js = f"""
+                function setNativeValue(element, value) {{
+                    const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
+                    const prototype = Object.getPrototypeOf(element);
+                    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
+                    
+                    if (valueSetter && valueSetter !== prototypeValueSetter) {{
+                        prototypeValueSetter.call(element, value);
+                    }} else {{
+                        valueSetter.call(element, value);
+                    }}
+                    element.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                    element.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                }}
 
-            await status_msg.edit_text("🔑 <b>Password ရိုက်ထည့်နေပါသည်...</b>")
-            # Screenshot အသစ်အရ placeholder="Password" ကို ပြောင်းလဲအသုံးပြုထားသည်
-            pwd_input = page.locator('input[placeholder="Password"]')
-            await pwd_input.click()
-            await pwd_input.clear()
-            await pwd_input.press_sequentially(password, delay=150)
-            await page.wait_for_timeout(500)
+                // ဖုန်းနံပါတ် (Language Independent)
+                let phone = document.querySelector('input[name="userNumber"]');
+                if (phone) setNativeValue(phone, '{username}');
+
+                // Password (Language Independent - Class ကိုသာ အသုံးပြုထားသည်)
+                let pwd = document.querySelector('.passwordInput__container-input input');
+                if (pwd) setNativeValue(pwd, '{password}');
+            """
+            
+            await page.evaluate(native_js)
+            await page.wait_for_timeout(1000)
 
             await status_msg.edit_text("🖱️ <b>Login ခလုတ်ကို နှိပ်နေပါသည်...</b>")
-            # Screenshot အသစ်အရ button class="active" ကို အသုံးပြုထားသည်
-            login_btn = page.locator('.signIn__container-button button.active')
-            await login_btn.tap(force=True) 
+            # ခလုတ်ကိုလည်း ဘာသာစကားမရွေး နှိပ်နိုင်ရန် ပြင်ဆင်ထားသည်
+            await page.evaluate("""
+                let btn = document.querySelector('.signIn__container-button');
+                if (btn) btn.click();
+                
+                // Fallback အတွက် Button အတိအကျကို ထပ်ရှာ၍နှိပ်မည်
+                let innerBtn = document.querySelector('.signIn__container-button button.active');
+                if (innerBtn) innerBtn.click();
+            """)
             
             await status_msg.edit_text("⏳ <b>ဝင်သွားရန် ၅ စက္ကန့် စောင့်နေပါသည်...</b>")
             await page.wait_for_timeout(5000)
 
-            # နောက်ဆုံးအခြေအနေကို Screenshot ရိုက်မည်
             await page.screenshot(path="test_result.png")
             
             if "login" not in page.url.lower():
@@ -92,7 +109,6 @@ async def run_playwright_login(message: types.Message, username, password):
             else:
                 await message.reply("❌ <b>Login မအောင်မြင်သေးပါ။ Screenshot ကို စစ်ဆေးကြည့်ပါ။</b>")
                 
-            # Screenshot ကို Telegram သို့ ပို့မည်
             photo = FSInputFile("test_result.png")
             await bot.send_photo(message.chat.id, photo, caption="📸 နောက်ဆုံး ရောက်ရှိနေသော မျက်နှာပြင်")
             if os.path.exists("test_result.png"):
@@ -108,7 +124,7 @@ async def run_playwright_login(message: types.Message, username, password):
             
         finally:
             await browser.close()
-            await status_msg.delete() # ပြီးသွားပါက status စာသားကို ဖျက်မည်
+            await status_msg.delete() 
 
 async def main():
     print("🚀 Login Test Bot စတင်နေပါပြီ...")
