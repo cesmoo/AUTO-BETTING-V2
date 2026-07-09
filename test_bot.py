@@ -37,10 +37,10 @@ async def start_login_test(message: types.Message):
     asyncio.create_task(run_playwright_login(message, username, password))
 
 # ==========================================
-# 🤖 3. PLAYWRIGHT LOGIN LOGIC (BURMESE UI FIX)
+# 🤖 3. PLAYWRIGHT LOGIN LOGIC (DEBUG MODE)
 # ==========================================
 async def run_playwright_login(message: types.Message, username, password):
-    status_msg = await message.reply("🔄 <b>Browser ဖွင့်၍ မြန်မာ UI ဖြင့် Login စမ်းသပ်နေပါသည်...</b>")
+    status_msg = await message.reply("🔄 <b>Browser ဖွင့်၍ Login စမ်းသပ်နေပါသည်...</b>")
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
@@ -53,16 +53,16 @@ async def run_playwright_login(message: types.Message, username, password):
         page = await context.new_page()
         
         try:
-            await status_msg.edit_text("🌐 <b>ဝဘ်ဆိုဒ်သို့ သွားနေပါသည်...</b>")
-            await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle")
+            await status_msg.edit_text("🌐 <b>ဝဘ်ဆိုဒ်သို့ သွားနေပါသည်... (စောင့်ပါ)</b>")
+            await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
             await page.wait_for_timeout(3000)
 
             await status_msg.edit_text("📱 <b>အချက်အလက်များ ရိုက်ထည့်နေပါသည်...</b>")
             
-            # 🔧 ညီကိုပို့ပေးထားသော Screenshot မှ မြန်မာစာ Tag များကို အတိအကျ အသုံးပြုထားပါသည်
+            # 🔧 JavaScript တွင် Fallback Selector များ ထပ်ထည့်ထားပါသည်
             native_js = f"""
                 function setNativeValue(element, value) {{
-                    if (!element) return;
+                    if (!element) return false;
                     const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
                     const prototype = Object.getPrototypeOf(element);
                     const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
@@ -74,14 +74,16 @@ async def run_playwright_login(message: types.Message, username, password):
                     }}
                     element.dispatchEvent(new Event('input', {{ bubbles: true }}));
                     element.dispatchEvent(new Event('change', {{ bubbles: true }}));
+                    return true;
                 }}
 
-                // ဖုန်းနံပါတ် 
                 let phone = document.querySelector('input[name="userNumber"]');
                 setNativeValue(phone, '{username}');
 
-                // Password (စကားဝှက် ဟု အတိအကျ ဖမ်းထားသည်)
-                let pwd = document.querySelector('input[placeholder="စကားဝှက်"]');
+                // Password အတွက် ဖြစ်နိုင်သမျှ Class များကို အကုန်ရှာပါမည်
+                let pwd = document.querySelector('input[placeholder="စကားဝှက်"]') || 
+                          document.querySelector('.passwordInput__container-input input') || 
+                          document.querySelector('input[type="password"]');
                 setNativeValue(pwd, '{password}');
             """
             
@@ -90,13 +92,14 @@ async def run_playwright_login(message: types.Message, username, password):
 
             await status_msg.edit_text("🖱️ <b>'လော့ဂ်အင်' ခလုတ်ကို နှိပ်နေပါသည်...</b>")
             
-            # ခလုတ်ကိုလည်း မြန်မာလို 'လော့ဂ်အင်' ကိုရှာပြီး နှိပ်ခိုင်းပါမည်
             await page.evaluate("""
-                let buttons = document.querySelectorAll('button.active');
+                let buttons = document.querySelectorAll('button.active, .signIn__container-button button, .signIn__container-button');
                 for (let btn of buttons) {
-                    if (btn.innerText.includes('လော့ဂ်အင်')) {
+                    if (btn.innerText.includes('လော့ဂ်အင်') || btn.innerText.includes('Log in')) {
                         btn.click();
                         break;
+                    } else if (btn.tagName === 'DIV') {
+                        btn.click();
                     }
                 }
             """)
@@ -104,29 +107,36 @@ async def run_playwright_login(message: types.Message, username, password):
             await status_msg.edit_text("⏳ <b>ဝင်သွားရန် ၅ စက္ကန့် စောင့်နေပါသည်...</b>")
             await page.wait_for_timeout(5000)
 
+            await status_msg.edit_text("📸 <b>Screenshot ရိုက်ကူးနေပါသည်...</b>")
             await page.screenshot(path="test_result.png")
             
             if "login" not in page.url.lower():
                 await message.reply(f"✅ <b>ဝင်သွားပါပြီ! Login အောင်မြင်ပါသည်။</b>\nလက်ရှိ URL: {page.url}")
             else:
-                await message.reply("❌ <b>Login မအောင်မြင်သေးပါ။ Screenshot ကို စစ်ဆေးကြည့်ပါ။</b>")
+                await message.reply("❌ <b>Login မအောင်မြင်သေးပါ။ Screenshot ကို စစ်ဆေးကြည့်ပါ။</b>\nလက်ရှိ URL: " + page.url)
                 
-            photo = FSInputFile("test_result.png")
-            await bot.send_photo(message.chat.id, photo, caption="📸 နောက်ဆုံး ရောက်ရှိနေသော မျက်နှာပြင်")
             if os.path.exists("test_result.png"):
+                photo = FSInputFile("test_result.png")
+                await bot.send_photo(message.chat.id, photo, caption="📸 နောက်ဆုံး ရောက်ရှိနေသော မျက်နှာပြင်")
                 os.remove("test_result.png")
 
         except Exception as e:
-            await message.reply(f"⚠️ <b>Error ဖြစ်သွားပါသည်:</b> {e}")
-            await page.screenshot(path="test_error.png")
-            if os.path.exists("test_error.png"):
-                photo = FSInputFile("test_error.png")
-                await bot.send_photo(message.chat.id, photo, caption="📸 Error တက်သွားသော မျက်နှာပြင်")
-                os.remove("test_error.png")
+            # Error အတိအကျကို ပြန်ပို့ပေးမည်
+            await message.reply(f"⚠️ <b>အဓိက Error ဖြစ်သွားပါသည်:</b>\n<code>{str(e)}</code>")
+            
+            try:
+                await page.screenshot(path="test_error.png")
+                if os.path.exists("test_error.png"):
+                    photo = FSInputFile("test_error.png")
+                    await bot.send_photo(message.chat.id, photo, caption="📸 Error တက်သွားသော မျက်နှာပြင်")
+                    os.remove("test_error.png")
+            except Exception as inner_e:
+                await message.reply(f"⚠️ <b>ဓာတ်ပုံရိုက်ရာတွင်လည်း Error ထပ်တက်ပါသည်:</b>\n<code>{str(inner_e)}</code>")
             
         finally:
             await browser.close()
-            await status_msg.delete() 
+            # ဤနေရာတွင် status_msg ကို မဖျက်တော့ပါ။ အဆုံးထိ ဘာဖြစ်သွားလဲ သိနိုင်ရန် ဖြစ်ပါသည်။
+            await status_msg.edit_text(status_msg.html_text + "\n\n🏁 <b>စမ်းသပ်မှု ပြီးဆုံးပါပြီ။ Browser ပိတ်လိုက်ပါပြီ။</b>")
 
 async def main():
     print("🚀 Login Test Bot စတင်နေပါပြီ...")
