@@ -106,29 +106,24 @@ async def run_playwright_login_func(message: types.Message, username, password, 
             await page.wait_for_timeout(8000)
 
             # ===========================================================
-            # 🚨 FIX: Popup နှစ်ခုလုံးကို Loop ပတ်ပြီး သေချာပေါက် ပိတ်မယ့် Logic
+            # 🔥 Popup ပိတ်ခြင်း (DOM ကနေ အတိအကျ ပစ်မှတ်ထား)
             # ===========================================================
             try:
-                # DOM ထဲက Class အတိုင်း ပစ်မှတ်ထားတဲ့ Selector
                 close_selector = ".announcement-dialog__button"
-                
-                # Popup တွေ အကုန်ပျောက်သွားတဲ့အထိ Loop ဆက်ပတ်မယ်
                 max_retries = 5
                 for _ in range(max_retries):
-                    # Button ကိုရှာမယ်
                     btn = await page.query_selector(close_selector)
                     if btn:
                         await btn.click()
-                        await page.wait_for_timeout(1000) # Button နှိပ်ပြီး animation ပြီးအောင် ၁ စက္ကန့်စောင့်
+                        await page.wait_for_timeout(1000)
                     else:
-                        break # Button မတွေ့တော့ဘူးဆိုရင် Loop ရပ်လိုက်မယ်
-                        
-                await page.wait_for_timeout(2000) # Popup အကုန်ပျောက်သွားအောင် နောက်ထပ် ၂ စက္ကန့်စောင့်
+                        break
+                await page.wait_for_timeout(2000)
             except:
                 pass
 
             # ===========================================================
-            # 📸 Screenshot (Popup ပိတ်ပြီးမှ ရိုက်မယ်)
+            # 📸 Screenshot
             # ===========================================================
             screenshot_path = "result.png"
             await page.screenshot(path=screenshot_path)
@@ -136,17 +131,26 @@ async def run_playwright_login_func(message: types.Message, username, password, 
             if "login" not in page.url.lower():
                 current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
-                # 🔥 Data Scraping (DOM အတိုင်း)
+                # ===========================================================
+                # 🔥 FINAL FIX: Data တွေ ပေါ်လာတဲ့အထိ စောင့်ပြီး ဆွဲမယ်
+                # ===========================================================
                 try:
+                    # 1. Balance ကို ဦးစွာ စောင့်ရှာမယ် (ဒါက နောက်ဆုံးပေါ်လာတတ်တယ်)
+                    await page.wait_for_selector('.totalSavings__container-header-box .balance_info p span', timeout=10000)
+                    
+                    # 2. User ID (DOM အတိုင်း span 3 ခုမြောက်ကို တိုက်ရိုက်ယူ)
                     uid_el = await page.query_selector('.userInfo__container-content-uid > span:nth-child(3)')
                     user_id = await uid_el.inner_text() if uid_el else "N/A"
 
+                    # 3. Nickname
                     nickname_el = await page.query_selector('.userInfo__container-content-nickname h3')
                     nickname = await nickname_el.inner_text() if nickname_el else "Unknown"
                     
+                    # 4. Balance
                     balance_el = await page.query_selector('.totalSavings__container-header-box .balance_info p span')
                     balance_text = await balance_el.inner_text() if balance_el else "0.00 Ks"
                     
+                    # 5. Login Time
                     logintime_el = await page.query_selector('.userInfo__container-content-logintime > span:nth-child(2)')
                     site_login_time = await logintime_el.inner_text() if logintime_el else current_time
 
@@ -181,10 +185,7 @@ async def run_playwright_login_func(message: types.Message, username, password, 
                 )
 
                 await message.answer(success_text, reply_markup=get_game_keyboard())
-                
-                # Result Screenshot ပို့မယ်
                 await bot.send_photo(message.chat.id, FSInputFile(screenshot_path), caption="📸 Result")
-                
                 await state.set_state(LoginForm.select_game)
                 
             else:
