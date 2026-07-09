@@ -106,10 +106,12 @@ async def run_playwright_login_func(message: types.Message, username, password, 
             await page.wait_for_timeout(8000)
 
             # ===========================================================
-            # 🔥 Popup ပိတ်ခြင်း (DOM ကနေ အတိအကျ ပစ်မှတ်ထား)
+            # 🔥 Popup နှစ်ခုလုံးကို Loop ပတ်ပြီး သေချာပေါက် ပိတ်မယ့် Logic
             # ===========================================================
             try:
+                # DOM ထဲက Class အတိုင်း (ပုံ 1 & 2)
                 close_selector = ".announcement-dialog__button"
+                
                 max_retries = 5
                 for _ in range(max_retries):
                     btn = await page.query_selector(close_selector)
@@ -123,7 +125,7 @@ async def run_playwright_login_func(message: types.Message, username, password, 
                 pass
 
             # ===========================================================
-            # 📸 Screenshot
+            # 📸 Screenshot (Popup ပိတ်ပြီးမှ ရိုက်မယ်)
             # ===========================================================
             screenshot_path = "result.png"
             await page.screenshot(path=screenshot_path)
@@ -132,34 +134,40 @@ async def run_playwright_login_func(message: types.Message, username, password, 
                 current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
                 # ===========================================================
-                # 🔥 FINAL FIX: Data တွေ ပေါ်လာတဲ့အထိ စောင့်ပြီး ဆွဲမယ်
+                # 🔥 DOM အတိုင်း 100% တိကျသော Selectors များ
                 # ===========================================================
                 try:
-                    # 1. Balance ကို ဦးစွာ စောင့်ရှာမယ် (ဒါက နောက်ဆုံးပေါ်လာတတ်တယ်)
-                    await page.wait_for_selector('.totalSavings__container-header-box .balance_info p span', timeout=10000)
+                    # 1. Balance (ပုံ 2) - ဒါက နောက်ဆုံးပေါ်လာတာမို့ ဒါကို ဦးစွာ စောင့်မယ်
+                    await page.wait_for_selector('.totalSavings__container-header-box .balance_info p span', timeout=15000)
                     
-                    # 2. User ID (DOM အတိုင်း span 3 ခုမြောက်ကို တိုက်ရိုက်ယူ)
+                    # 2. User ID (ပုံ 3) - span သုံးခုမြောက်
                     uid_el = await page.query_selector('.userInfo__container-content-uid > span:nth-child(3)')
                     user_id = await uid_el.inner_text() if uid_el else "N/A"
 
-                    # 3. Nickname
+                    # 3. Nickname (ပုံ 5)
                     nickname_el = await page.query_selector('.userInfo__container-content-nickname h3')
                     nickname = await nickname_el.inner_text() if nickname_el else "Unknown"
                     
-                    # 4. Balance
+                    # 4. Balance Text
                     balance_el = await page.query_selector('.totalSavings__container-header-box .balance_info p span')
                     balance_text = await balance_el.inner_text() if balance_el else "0.00 Ks"
                     
-                    # 5. Login Time
+                    # 5. Login Time (ပုံ 4)
                     logintime_el = await page.query_selector('.userInfo__container-content-logintime > span:nth-child(2)')
                     site_login_time = await logintime_el.inner_text() if logintime_el else current_time
+                    
+                    # 6. Active Tab Name (ပုံ 1) - "လောင်းကစား" ဆိုတဲ့ Tab က active ဖြစ်နေတယ်
+                    # Tabbar က item 5 ခုရှိတယ်။ 5 ခုမြောက် (index 4) က active ဖြစ်နေတယ်။
+                    tab_active_el = await page.query_selector('.tabbar__container-item.active > span')
+                    active_tab_name = await tab_active_el.inner_text() if tab_active_el else "N/A"
 
                 except Exception:
-                    user_id, nickname, balance_text, site_login_time = "N/A", "Unknown", "0.00 Ks", current_time
+                    user_id, nickname, balance_text, site_login_time, active_tab_name = "N/A", "Unknown", "0.00 Ks", current_time, "N/A"
                 
                 nickname = nickname.strip()
                 user_id = user_id.strip()
                 balance_text = balance_text.strip()
+                active_tab_name = active_tab_name.strip()
 
                 success_text = (
                     "✅ <b>LOGIN SUCCESSFUL</b>\n"
@@ -171,6 +179,7 @@ async def run_playwright_login_func(message: types.Message, username, password, 
                     "├─ 🏷️ <b>Nickname:</b> <i>{nickname}</i>\n"
                     "├─ 💰 <b>Balance:</b> <i>{balance}</i>\n"
                     "├─ 📅 <b>Login Date:</b> <i>{site_login_time}</i>\n"
+                    "├─ 📌 <b>Active Tab:</b> <i>{active_tab}</i>\n"
                     "└─ ✅ <b>Allow Withdraw:</b> Yes\n"
                     "━━━━━━━━━━━━━━━━━━━━━━\n"
                     "💎 <b>Auto Bet is available.</b>\n"
@@ -181,7 +190,8 @@ async def run_playwright_login_func(message: types.Message, username, password, 
                     username=username, 
                     nickname=nickname, 
                     balance=balance_text, 
-                    site_login_time=site_login_time
+                    site_login_time=site_login_time,
+                    active_tab=active_tab_name
                 )
 
                 await message.answer(success_text, reply_markup=get_game_keyboard())
