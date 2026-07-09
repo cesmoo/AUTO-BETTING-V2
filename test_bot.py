@@ -95,74 +95,13 @@ async def process_phone(message: types.Message, state: FSMContext):
     await message.answer("🔑 <b>Please enter your password:</b>", reply_markup=ReplyKeyboardRemove())
 
 # ==========================================================
-# 🔧 Playwright Helper Function (Login & Debug)
-# ==========================================================
-async def perform_login(page, username, password):
-    try:
-        await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
-        await page.wait_for_timeout(3000)
-        
-        js_code = """
-        ([user, pwd]) => {
-            function fillVueInput(element, value) {
-                if (!element) return false;
-                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                nativeSetter.call(element, value);
-                element.dispatchEvent(new Event('input', { bubbles: true }));
-                element.dispatchEvent(new Event('change', { bubbles: true }));
-                element.blur();
-                return true;
-            }
-            let phone = document.querySelector('input[name="userNumber"]');
-            fillVueInput(phone, user);
-            let pass = document.querySelector('input[placeholder="စကားဝှက်"]') || 
-                       document.querySelector('input[placeholder="Password"]') || 
-                       document.querySelector('.passwordInput__container-input input');
-            fillVueInput(pass, pwd);
-        }
-        """
-        await page.evaluate(js_code, [username, password])
-        await page.wait_for_timeout(1000)
-        
-        await page.evaluate("""
-            () => {
-                let btn = document.querySelector('button.active');
-                if (btn) btn.click();
-            }
-        """)
-        await page.wait_for_timeout(5000)
-        
-        # Popup ပိတ်ခြင်း
-        try:
-            for _ in range(3):
-                btn = await page.query_selector(".announcement-dialog__button")
-                if btn:
-                    await btn.click()
-                    await page.wait_for_timeout(1000)
-                else:
-                    break
-        except:
-            pass
-            
-        if "login" not in page.url.lower():
-            return True, "Success"
-        else:
-            await page.screenshot(path="debug_login.png")
-            return False, f"URL က Login Page မှာပဲ ရှိနေပါသေးတယ်။ စကားဝှက်မှားနေခြင်း သို့မဟုတ် လုံခြုံရေးတားမြစ်ချက်ဖြစ်နိုင်သည်။"
-            
-    except Exception as e:
-        await page.screenshot(path="debug_login.png")
-        return False, str(e)
-
-# ==========================================================
-# 🔥 Playwright Logic: Initial Login & Scraping
+# 🔧 Initial Login & Session Save
 # ==========================================================
 @dp.message(LoginForm.enter_password)
 async def process_password(message: types.Message, state: FSMContext):
     password = message.text
     data = await state.get_data()
     username = data.get('phone')
-    await state.update_data(password=password)
     
     loading_msg = await message.answer("🔄 <b>အကောင့်ဝင်နေပါသည်... ခဏစောင့်ပါ...</b>")
     
@@ -172,9 +111,45 @@ async def process_password(message: types.Message, state: FSMContext):
         page = await context.new_page()
         
         try:
-            is_login_success, err_msg = await perform_login(page, username, password)
+            await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
+            await page.wait_for_timeout(3000)
             
-            if is_login_success:
+            js_code = """
+            ([user, pwd]) => {
+                function fillVueInput(element, value) {
+                    if (!element) return false;
+                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                    nativeSetter.call(element, value);
+                    element.dispatchEvent(new Event('input', { bubbles: true }));
+                    element.dispatchEvent(new Event('change', { bubbles: true }));
+                    element.blur();
+                    return true;
+                }
+                let phone = document.querySelector('input[name="userNumber"]');
+                fillVueInput(phone, user);
+                let pass = document.querySelector('input[placeholder="စကားဝှက်"]') || 
+                           document.querySelector('input[placeholder="Password"]') || 
+                           document.querySelector('.passwordInput__container-input input');
+                fillVueInput(pass, pwd);
+            }
+            """
+            await page.evaluate(js_code, [username, password])
+            await page.wait_for_timeout(1000)
+            
+            await page.evaluate("""
+                () => {
+                    let btn = document.querySelector('button.active');
+                    if (btn) btn.click();
+                }
+            """)
+            await page.wait_for_timeout(5000)
+            
+            if "login" not in page.url.lower():
+                # 💾 အရေးကြီးဆုံးအပိုင်း: Login အောင်မြင်ပါက Session (Cookies) ကို သိမ်းဆည်းပါမည်
+                session_file = f"session_{message.from_user.id}.json"
+                await context.storage_state(path=session_file)
+
+                # Info စာမျက်နှာသို့ ဆက်သွားခြင်း
                 try:
                     await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
                     await page.wait_for_timeout(3000)
@@ -201,10 +176,12 @@ async def process_password(message: types.Message, state: FSMContext):
                 await message.answer("✅ <b>LOGIN SUCCESSFUL</b>", reply_markup=get_logged_in_keyboard())
                 await state.set_state(LoginForm.main_menu)
             else:
-                await message.answer(f"❌ <b>Login မအောင်မြင်ပါ။</b>\n\n<b>Debug Error:</b> <code>{html.escape(err_msg)}</code>", reply_markup=get_main_keyboard())
+                await page.screenshot(path="debug_login.png")
+                await message.answer("❌ <b>Login မအောင်မြင်ပါ။</b> စကားဝှက် မှားယွင်းနေနိုင်ပါသည်။", reply_markup=get_main_keyboard())
                 if os.path.exists("debug_login.png"):
-                    await message.answer_photo(FSInputFile("debug_login.png"), caption="📸 Error ဖြစ်နေသော မျက်နှာပြင်")
+                    await message.answer_photo(FSInputFile("debug_login.png"))
                 await state.clear()
+            
             await loading_msg.delete()
         except Exception as e:
             await message.answer(f"⚠️ <b>System Error:</b> {html.escape(str(e))}", reply_markup=get_main_keyboard())
@@ -233,34 +210,33 @@ async def show_info(message: types.Message, state: FSMContext):
 @dp.message(LoginForm.main_menu, F.text == "💰 Balance")
 async def check_balance_cmd(message: types.Message, state: FSMContext):
     global is_bot_running
-    data = await state.get_data()
-    
     if is_bot_running:
+        data = await state.get_data()
         current_bal = data.get('balance', '0.00 Ks')
-        await message.answer(f"💰 <b>လက်ရှိ လက်ကျန်ငွေ (Saved):</b> {current_bal}\n\n⚠️ <i>Auto-bet အလုပ်လုပ်နေချိန်ဖြစ်သဖြင့် နောက်ဆုံးသိမ်းဆည်းထားသော ပမာဏကိုသာ ပြသပါသည်။</i>")
-        return
+        return await message.answer(f"💰 <b>လက်ရှိ လက်ကျန်ငွေ (Saved):</b> {current_bal}\n\n⚠️ <i>Auto-bet အလုပ်လုပ်နေချိန်ဖြစ်သဖြင့် နောက်ဆုံးသိမ်းဆည်းထားသော ပမာဏကိုသာ ပြသပါသည်။</i>")
 
-    msg = await message.answer("🔄 <b>Live Balance စစ်ဆေးနေပါသည်...</b>")
-    username, password = data.get('username'), data.get('password')
+    session_file = f"session_{message.from_user.id}.json"
+    if not os.path.exists(session_file):
+        return await message.answer("❌ Session မရှိပါ။ ကျေးဇူးပြု၍ Login အရင်ဝင်ပါ။")
+
+    msg = await message.answer("🔄 <b>Live Balance ကို တိုက်ရိုက် စစ်ဆေးနေပါသည်...</b>")
     
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-        context = await browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True)
+        # 🚀 Session ဖြင့် တိုက်ရိုက်ဝင်ရောက်ခြင်း
+        context = await browser.new_context(storage_state=session_file, viewport={'width': 390, 'height': 844}, is_mobile=True)
         page = await context.new_page()
         try:
-            success, _ = await perform_login(page, username, password)
-            if success:
-                await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
-                await page.wait_for_timeout(3000)
-                bal_el = page.locator('.balance_info p.totalSavings__container-header__subtitle span').first
-                if await bal_el.is_visible(timeout=3000):
-                    live_bal = await bal_el.inner_text()
-                    await state.update_data(balance=live_bal)
-                    await msg.edit_text(f"💰 <b>Live လက်ကျန်ငွေ:</b> {live_bal}")
-                else:
-                    await msg.edit_text("⚠️ Balance ရှာမတွေ့ပါ။")
+            await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
+            await page.wait_for_timeout(3000)
+            
+            bal_el = page.locator('.balance_info p.totalSavings__container-header__subtitle span').first
+            if await bal_el.is_visible(timeout=3000):
+                live_bal = await bal_el.inner_text()
+                await state.update_data(balance=live_bal)
+                await msg.edit_text(f"💰 <b>Live လက်ကျန်ငွေ:</b> {live_bal}")
             else:
-                await msg.edit_text("❌ အကောင့်ဝင်၍မရသဖြင့် Balance စစ်၍မရပါ။")
+                await msg.edit_text("⚠️ Balance ရှာမတွေ့ပါ။ Session သက်တမ်းကုန်သွားခြင်း ဖြစ်နိုင်ပါသည်။")
         except Exception as e:
             await msg.edit_text(f"⚠️ Error: {str(e)}")
         finally:
@@ -288,10 +264,13 @@ async def save_bet_size(message: types.Message, state: FSMContext):
 @dp.message(LoginForm.main_menu, F.text == "🔐 Logout")
 async def logout(message: types.Message, state: FSMContext):
     await state.clear()
+    session_file = f"session_{message.from_user.id}.json"
+    if os.path.exists(session_file):
+        os.remove(session_file) # Session ကို ဖျက်ပစ်မည်
     await message.answer("👋 အကောင့်ထွက်ပြီးပါပြီ။", reply_markup=get_main_keyboard())
 
 # ==========================================================
-# 🎰 Auto-Bet Logic & Loop
+# 🎰 Auto-Bet Logic & Loop (DIRECT URL)
 # ==========================================================
 async def place_bet(page, bet_type, amount):
     try:
@@ -341,36 +320,35 @@ async def start_autobet(message: types.Message, state: FSMContext):
     if is_bot_running:
         return await message.answer("⚠️ Auto-Bet အလုပ်လုပ်နေဆဲပါ။ ရပ်ချင်ပါက /stop ကို ရိုက်ထည့်ပါ။")
     
+    session_file = f"session_{message.from_user.id}.json"
+    if not os.path.exists(session_file):
+        return await message.answer("❌ Session မရှိပါ။ ကျေးဇူးပြု၍ Login အရင်ဝင်ပါ။")
+
     data = await state.get_data()
-    username, password = data.get('username'), data.get('password')
     bet_sequence = data.get('bet_sequence', [10, 30, 90, 270])
     
     is_bot_running = True
     status_msg = await message.answer("🚀 <b>Auto-Betting စတင်ရန် Browser ဖွင့်နေပါသည်...</b>")
-    asyncio.create_task(run_betting_loop(message, status_msg, username, password, bet_sequence))
+    asyncio.create_task(run_betting_loop(message, status_msg, session_file, bet_sequence))
 
-async def run_betting_loop(message, status_msg, username, password, bet_sequence):
+async def run_betting_loop(message, status_msg, session_file, bet_sequence):
     global is_bot_running
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-        context = await browser.new_context(viewport={'width': 390, 'height': 844}, is_mobile=True)
+        # 🚀 Session ဖြင့် တိုက်ရိုက်ဝင်ရောက်ခြင်း
+        context = await browser.new_context(storage_state=session_file, viewport={'width': 390, 'height': 844}, is_mobile=True)
         page = await context.new_page()
         
         try:
-            await status_msg.edit_text("🔄 <b>အကောင့်သို့ ဝင်ရောက်နေပါသည်...</b>")
-            success, err_msg = await perform_login(page, username, password)
-            
-            if not success:
-                is_bot_running = False
-                await status_msg.edit_text(f"❌ <b>Login ဝင်ရာတွင် အမှားဖြစ်သွားပါသည်။</b>\n\n<b>Debug Info:</b>\n<code>{html.escape(err_msg)}</code>")
-                if os.path.exists("debug_login.png"):
-                    await message.answer_photo(FSInputFile("debug_login.png"), caption="📸 Error မျက်နှာပြင်")
-                return
-                
-            await status_msg.edit_text("🎮 <b>WinGo ဂိမ်းစာမျက်နှာသို့ သွားနေပါသည်...</b>")
+            await status_msg.edit_text("🎮 <b>WinGo ဂိမ်းစာမျက်နှာသို့ တိုက်ရိုက် သွားနေပါသည်...</b>")
             await page.goto("https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1", wait_until="networkidle")
             await page.wait_for_timeout(4000)
             
+            # ဂိမ်းစာမျက်နှာ ဟုတ်မဟုတ် စစ်ဆေးခြင်း
+            if "login" in page.url.lower():
+                is_bot_running = False
+                return await status_msg.edit_text("❌ Session သက်တမ်းကုန်သွားပါသည်။ ကျေးဇူးပြု၍ Login ပြန်ဝင်ပေးပါ။")
+
             await status_msg.edit_text(f"✅ <b>Auto-Bet စတင်ပါပြီ!</b>\n👉 အဆင့်များ: {bet_sequence}")
             
             current_step, current_pattern_index = 0, 0
@@ -412,7 +390,7 @@ async def run_betting_loop(message, status_msg, username, password, bet_sequence
 # 🚀 Main Bot Loop
 # ==========================================================
 async def main():
-    print("🚀 Auto-Bet v2 စတင်နေပါပြီ...")
+    print("🚀 Auto-Bet v2 (Session Save) စတင်နေပါပြီ...")
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
