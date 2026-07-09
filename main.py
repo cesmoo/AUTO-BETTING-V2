@@ -31,7 +31,7 @@ async def run_playwright_login(phone, password):
             )
             page = await context.new_page()
             
-            await page.goto("https://www.777bigwingame.app/#/login", timeout=60000)
+            await page.goto("https://www.777bigwingame.app", timeout=60000)
             
             # စက္ကန့် ၂၀ အထိ စောင့်ကြည့်မည်
             await page.wait_for_selector('input[name="userNumber"]', timeout=20000)
