@@ -105,75 +105,49 @@ async def run_playwright_login_func(message: types.Message, username, password, 
             
             await page.wait_for_timeout(8000)
 
-            # 🚨 Popup ရှိရင် ရှာပြီးပိတ်မယ်
+            # ===========================================================
+            # 🚨 FIX: Popup နှစ်ခုလုံးကို Loop ပတ်ပြီး သေချာပေါက် ပိတ်မယ့် Logic
+            # ===========================================================
             try:
-                close_selectors = [
-                    'button:has-text("အတည်ပြုပါ")', 'button:has-text("Confirm")',
-                    '.el-dialog__headerbtn', '.dialog-close-btn', '.close-btn'
-                ]
-                for selector in close_selectors:
-                    btn = await page.query_selector(selector)
+                # DOM ထဲက Class အတိုင်း ပစ်မှတ်ထားတဲ့ Selector
+                close_selector = ".announcement-dialog__button"
+                
+                # Popup တွေ အကုန်ပျောက်သွားတဲ့အထိ Loop ဆက်ပတ်မယ်
+                max_retries = 5
+                for _ in range(max_retries):
+                    # Button ကိုရှာမယ်
+                    btn = await page.query_selector(close_selector)
                     if btn:
                         await btn.click()
-                        await page.wait_for_timeout(2000)
-                        break
+                        await page.wait_for_timeout(1000) # Button နှိပ်ပြီး animation ပြီးအောင် ၁ စက္ကန့်စောင့်
+                    else:
+                        break # Button မတွေ့တော့ဘူးဆိုရင် Loop ရပ်လိုက်မယ်
+                        
+                await page.wait_for_timeout(2000) # Popup အကုန်ပျောက်သွားအောင် နောက်ထပ် ၂ စက္ကန့်စောင့်
             except:
                 pass
 
             # ===========================================================
-            # 🔥 Visual Debug အတွက် ရှာမယ့် Element တွေကို သတ်မှတ်ခြင်း
+            # 📸 Screenshot (Popup ပိတ်ပြီးမှ ရိုက်မယ်)
             # ===========================================================
-            debug_elements = {
-                "User ID": '.userInfo__container-content-uid > span:nth-child(3)',
-                "Nickname": '.userInfo__container-content-nickname h3',
-                "Balance": '.totalSavings__container-header-box .balance_info p span',
-                "Login Time": '.userInfo__container-content-logintime > span:nth-child(2)'
-            }
-
-            highlight_css = """
-                el => {
-                    el.style.border = '4px solid red';
-                    el.style.background = 'rgba(255, 0, 0, 0.3)';
-                }
-            """
-
-            found_any = False
-            for name, selector in debug_elements.items():
-                try:
-                    el = await page.query_selector(selector)
-                    if el:
-                        await el.evaluate(highlight_css)
-                        found_any = True
-                    else:
-                        pass
-                except:
-                    pass
-
-            # 📸 Debug Screenshot (အကွက်တွေဆွဲပြီးသား) ကို ရိုက်မယ်
-            debug_screenshot = "debug_result.png"
-            await page.screenshot(path=debug_screenshot)
-
-            # 📸 Normal Screenshot (ပုံမှန်)
-            normal_screenshot = "result.png"
-            await page.screenshot(path=normal_screenshot)
+            screenshot_path = "result.png"
+            await page.screenshot(path=screenshot_path)
             
             if "login" not in page.url.lower():
                 current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
-                # ===========================================================
-                # 🔥 Data Scraping
-                # ===========================================================
+                # 🔥 Data Scraping (DOM အတိုင်း)
                 try:
-                    uid_el = await page.query_selector(debug_elements["User ID"])
+                    uid_el = await page.query_selector('.userInfo__container-content-uid > span:nth-child(3)')
                     user_id = await uid_el.inner_text() if uid_el else "N/A"
 
-                    nickname_el = await page.query_selector(debug_elements["Nickname"])
+                    nickname_el = await page.query_selector('.userInfo__container-content-nickname h3')
                     nickname = await nickname_el.inner_text() if nickname_el else "Unknown"
                     
-                    balance_el = await page.query_selector(debug_elements["Balance"])
+                    balance_el = await page.query_selector('.totalSavings__container-header-box .balance_info p span')
                     balance_text = await balance_el.inner_text() if balance_el else "0.00 Ks"
                     
-                    logintime_el = await page.query_selector(debug_elements["Login Time"])
+                    logintime_el = await page.query_selector('.userInfo__container-content-logintime > span:nth-child(2)')
                     site_login_time = await logintime_el.inner_text() if logintime_el else current_time
 
                 except Exception:
@@ -208,13 +182,8 @@ async def run_playwright_login_func(message: types.Message, username, password, 
 
                 await message.answer(success_text, reply_markup=get_game_keyboard())
                 
-                # 🔥 Debug အတွက် Screenshot နှစ်ခုလုံး ပို့ပေးမယ်
-                if found_any:
-                    await bot.send_photo(message.chat.id, FSInputFile(debug_screenshot), caption="🔴 Element Finder (အနီရောင်အကွက်တွေက ရှာတွေ့သွားတဲ့ Element တွေပါ)")
-                else:
-                    await bot.send_photo(message.chat.id, FSInputFile(debug_screenshot), caption="❌ Element တွေ မတွေ့သေးပါ (Popup က ဖုံးနေသေးလား စစ်ကြည့်ပါ)")
-
-                await bot.send_photo(message.chat.id, FSInputFile(normal_screenshot), caption="📸 Result")
+                # Result Screenshot ပို့မယ်
+                await bot.send_photo(message.chat.id, FSInputFile(screenshot_path), caption="📸 Result")
                 
                 await state.set_state(LoginForm.select_game)
                 
@@ -222,8 +191,7 @@ async def run_playwright_login_func(message: types.Message, username, password, 
                 await message.answer("❌ <b>Login မအောင်မြင်ပါ။</b>", reply_markup=get_main_keyboard())
                 await state.clear()
 
-            if os.path.exists(debug_screenshot): os.remove(debug_screenshot)
-            if os.path.exists(normal_screenshot): os.remove(normal_screenshot)
+            if os.path.exists(screenshot_path): os.remove(screenshot_path)
             await loading_msg.delete()
 
         except Exception as e:
