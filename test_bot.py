@@ -1,6 +1,6 @@
 import asyncio
 import os
-import html # HTML Tag များကို ကာကွယ်ရန်
+import html
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -38,7 +38,7 @@ async def start_login_test(message: types.Message):
     asyncio.create_task(run_playwright_login(message, username, password))
 
 # ==========================================
-# 🤖 3. PLAYWRIGHT LOGIN LOGIC (FULLY FIXED)
+# 🤖 3. PLAYWRIGHT LOGIN LOGIC (TYPERROR FIXED)
 # ==========================================
 async def run_playwright_login(message: types.Message, username, password):
     await message.reply("🔄 <b>၁. Browser စတင်ဖွင့်နေပါသည်...</b>")
@@ -64,42 +64,37 @@ async def run_playwright_login(message: types.Message, username, password):
 
                 await message.reply("📱 <b>၃. အချက်အလက်များ ရိုက်ထည့်နေပါသည်...</b>")
                 
-                # 🔧 Fix 1: JavaScript ကို Function အနေဖြင့် သေသေချာချာ ရေးသားခြင်း
+                # 🔧 Fix: TypeError မတက်စေရန် window.HTMLInputElement.prototype မှတစ်ဆင့် Native Setter ကို တိုက်ရိုက်ယူပါမည်
                 js_code = """
                 ([user, pwd]) => {
-                    function setNativeValue(element, value) {
+                    function fillVueInput(element, value) {
                         if (!element) return false;
-                        const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
-                        const prototype = Object.getPrototypeOf(element);
-                        const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
                         
-                        if (valueSetter && valueSetter !== prototypeValueSetter) {
-                            prototypeValueSetter.call(element, value);
-                        } else {
-                            valueSetter.call(element, value);
-                        }
+                        // Native DOM setter ကို တိုက်ရိုက်လှမ်းခေါ်ခြင်း (TypeError ကို ရှောင်ရှားရန်)
+                        const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                        nativeSetter.call(element, value);
+                        
+                        // Vue.js အား အသိပေးခြင်း
                         element.dispatchEvent(new Event('input', { bubbles: true }));
                         element.dispatchEvent(new Event('change', { bubbles: true }));
                         return true;
                     }
 
                     let phone = document.querySelector('input[name="userNumber"]');
-                    setNativeValue(phone, user);
+                    fillVueInput(phone, user);
 
                     let pass = document.querySelector('input[placeholder="စကားဝှက်"]') || 
                                document.querySelector('.passwordInput__container-input input') || 
                                document.querySelector('input[type="password"]');
-                    setNativeValue(pass, pwd);
+                    fillVueInput(pass, pwd);
                 }
                 """
                 
-                # Function ထဲသို့ Argument များ (username, password) လှမ်းပို့ပေးခြင်း
                 await page.evaluate(js_code, [username, password])
                 await page.wait_for_timeout(1000)
 
                 await message.reply("🖱️ <b>၄. 'လော့ဂ်အင်' ခလုတ်ကို နှိပ်နေပါသည်...</b>")
                 
-                # ခလုတ်နှိပ်ခြင်းကိုလည်း Function အနေဖြင့် ပြောင်းရေးထားပါသည်
                 await page.evaluate("""
                 () => {
                     let buttons = document.querySelectorAll('button.active, .signIn__container-button button, .signIn__container-button');
@@ -131,7 +126,6 @@ async def run_playwright_login(message: types.Message, username, password):
                     os.remove("test_result.png")
 
             except Exception as inner_e:
-                # 🔧 Fix 2: Error များကို HTML Tag အဖြစ် မထင်စေရန် html.escape() ဖြင့် ကာကွယ်ခြင်း
                 safe_error = html.escape(str(inner_e))
                 await bot.send_message(message.chat.id, f"⚠️ <b>အတွင်းပိုင်း Error ဖြစ်သွားပါသည်:</b>\n<pre>{safe_error}</pre>")
                 
