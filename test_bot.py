@@ -13,28 +13,18 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.types import FSInputFile, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from playwright.async_api import async_playwright
 
-# ==========================================
-# 1. Config & Bot Setup
-# ==========================================
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-# ==========================================
-# 2. FSM States
-# ==========================================
 class LoginForm(StatesGroup):
     select_site = State()
     enter_phone = State()
     enter_password = State()
     select_game = State()
 
-# ==========================================
-# 3. Custom Keyboards
-# ==========================================
 def get_main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="🔐 Login")], [KeyboardButton(text="🎰 Games")]],
@@ -53,9 +43,6 @@ def get_game_keyboard():
         resize_keyboard=True
     )
 
-# ==========================================
-# 4. Command Handlers
-# ==========================================
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message):
     await message.answer("👋 <b>မင်္ဂလာပါ!</b>", reply_markup=get_main_keyboard())
@@ -88,9 +75,6 @@ async def process_password(message: types.Message, state: FSMContext):
     loading_msg = await message.answer("🔄 <b>အကောင့်ဝင်နေပါသည်... ခဏစောင့်ပါ...</b>", reply_markup=get_main_keyboard())
     asyncio.create_task(run_playwright_login_func(message, username, password, state, loading_msg))
 
-# ==========================================
-# 5. Playwright Logic (DOM Selectors နဲ့ Data Scraping)
-# ==========================================
 async def run_playwright_login_func(message: types.Message, username, password, state: FSMContext, loading_msg: types.Message):
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
@@ -119,46 +103,51 @@ async def run_playwright_login_func(message: types.Message, username, password, 
                 }
             """)
             
-            # 🔥 Data များ Load ရန် ၈ စက္ကန့် စောင့်ပါ
-            await page.wait_for_timeout(8000)
+            # 🔥 Data Load ဖို့ စောင့်ချိန် ၇ စက္ကန့်
+            await page.wait_for_timeout(7000)
             
+            # 🚨 Step 1: Popup ရှိရင် ပိတ်မယ် (Screenshot ထဲက အကြီးကြီးကို ဖယ်ရှားဖို့)
+            try:
+                # Popup ကို ရှာမယ်။ Button ရဲ့ Text က "အတည်ပြုပါ" ဖြစ်နိုင်တယ်။
+                close_popup_btn = await page.query_selector('button:has-text("အတည်ပြုပါ"), button:has-text("Confirm"), .dialog-close-btn, .el-dialog__headerbtn')
+                if close_popup_btn:
+                    await close_popup_btn.click()
+                    await page.wait_for_timeout(2000) # Popup ပိတ်သွားအောင် ၂ စက္ကန့်စောင့်
+            except:
+                pass # Popup မရှိရင် ဘာမှမလုပ်ပါဘူး
+
+            # 📸 Screenshot ရိုက်မယ် (Popup ပိတ်သွားပြီးမှ)
             screenshot_path = "result.png"
             await page.screenshot(path=screenshot_path)
             
             if "login" not in page.url.lower():
                 current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 
-                # ===========================================================
-                # 🔥 DOM ထဲက Class တွေကို တိုက်ရိုက် ပစ်မှတ်ထား ဆွဲထုတ်ခြင်း
-                # ===========================================================
+                # 🔥 Data Scraping (DOM အတိုင်း)
                 try:
-                    # 1. User ID (ပုံ ၂ ကို ကြည့်ပါ)
+                    # User ID
                     uid_el = await page.query_selector('.userInfo__container-content-uid > span:nth-child(3)')
                     user_id = await uid_el.inner_text() if uid_el else "N/A"
 
-                    # 2. Nickname (ပုံ ၄ ကို ကြည့်ပါ)
+                    # Nickname
                     nickname_el = await page.query_selector('.userInfo__container-content-nickname h3')
                     nickname = await nickname_el.inner_text() if nickname_el else "Unknown"
                     
-                    # 3. Balance (ပုံ ၁ ကို ကြည့်ပါ)
+                    # Balance
                     balance_el = await page.query_selector('.totalSavings__container-header-box .balance_info p span')
                     balance_text = await balance_el.inner_text() if balance_el else "0.00 Ks"
                     
-                    # 4. Login Time (ပုံ ၃ ကို ကြည့်ပါ) - Site ပေါ်က Time ကိုယူမယ်
+                    # Login Time
                     logintime_el = await page.query_selector('.userInfo__container-content-logintime > span:nth-child(2)')
                     site_login_time = await logintime_el.inner_text() if logintime_el else current_time
 
                 except Exception:
                     user_id, nickname, balance_text, site_login_time = "N/A", "Unknown", "0.00 Ks", current_time
                 
-                # Data သန့်ရှင်းခြင်း
                 nickname = nickname.strip()
                 user_id = user_id.strip()
                 balance_text = balance_text.strip()
 
-                # ===========================================================
-                # 🎨 Result Card Formatting
-                # ===========================================================
                 success_text = (
                     "✅ <b>LOGIN SUCCESSFUL</b>\n"
                     "━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -184,7 +173,6 @@ async def run_playwright_login_func(message: types.Message, username, password, 
 
                 await message.answer(success_text, reply_markup=get_game_keyboard()) 
                 await bot.send_photo(message.chat.id, FSInputFile(screenshot_path), caption="📸 Result")
-                
                 await state.set_state(LoginForm.select_game)
                 
             else:
@@ -201,9 +189,6 @@ async def run_playwright_login_func(message: types.Message, username, password, 
         finally:
             await browser.close()
 
-# ==========================================
-# 6. Game Selection Handler
-# ==========================================
 @dp.message(LoginForm.select_game)
 async def process_game_selection(message: types.Message, state: FSMContext):
     if message.text == "🔙 နောက်သို့":
@@ -212,9 +197,6 @@ async def process_game_selection(message: types.Message, state: FSMContext):
     await message.answer(f"🎮 <b>သင်ရွေးချယ်ထားသော Game:</b> {message.text}", reply_markup=get_main_keyboard())
     await state.clear()
 
-# ==========================================
-# 7. Main Execution
-# ==========================================
 async def main():
     await dp.start_polling(bot)
 
