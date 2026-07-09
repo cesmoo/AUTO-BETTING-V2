@@ -1,5 +1,6 @@
 import asyncio
 import os
+import html # HTML Tag များကို ကာကွယ်ရန်
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -37,106 +38,119 @@ async def start_login_test(message: types.Message):
     asyncio.create_task(run_playwright_login(message, username, password))
 
 # ==========================================
-# 🤖 3. PLAYWRIGHT LOGIN LOGIC (DEBUG MODE)
+# 🤖 3. PLAYWRIGHT LOGIN LOGIC (FULLY FIXED)
 # ==========================================
 async def run_playwright_login(message: types.Message, username, password):
-    status_msg = await message.reply("🔄 <b>Browser ဖွင့်၍ Login စမ်းသပ်နေပါသည်...</b>")
+    await message.reply("🔄 <b>၁. Browser စတင်ဖွင့်နေပါသည်...</b>")
     
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
-            viewport={'width': 390, 'height': 844}, 
-            is_mobile=True, 
-            has_touch=True  
-        )
-        page = await context.new_page()
-        
-        try:
-            await status_msg.edit_text("🌐 <b>ဝဘ်ဆိုဒ်သို့ သွားနေပါသည်... (စောင့်ပါ)</b>")
-            await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
-            await page.wait_for_timeout(3000)
-
-            await status_msg.edit_text("📱 <b>အချက်အလက်များ ရိုက်ထည့်နေပါသည်...</b>")
-            
-            # 🔧 JavaScript တွင် Fallback Selector များ ထပ်ထည့်ထားပါသည်
-            native_js = f"""
-                function setNativeValue(element, value) {{
-                    if (!element) return false;
-                    const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
-                    const prototype = Object.getPrototypeOf(element);
-                    const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
-                    
-                    if (valueSetter && valueSetter !== prototypeValueSetter) {{
-                        prototypeValueSetter.call(element, value);
-                    }} else {{
-                        valueSetter.call(element, value);
-                    }}
-                    element.dispatchEvent(new Event('input', {{ bubbles: true }}));
-                    element.dispatchEvent(new Event('change', {{ bubbles: true }}));
-                    return true;
-                }}
-
-                let phone = document.querySelector('input[name="userNumber"]');
-                setNativeValue(phone, '{username}');
-
-                // Password အတွက် ဖြစ်နိုင်သမျှ Class များကို အကုန်ရှာပါမည်
-                let pwd = document.querySelector('input[placeholder="စကားဝှက်"]') || 
-                          document.querySelector('.passwordInput__container-input input') || 
-                          document.querySelector('input[type="password"]');
-                setNativeValue(pwd, '{password}');
-            """
-            
-            await page.evaluate(native_js)
-            await page.wait_for_timeout(1000)
-
-            await status_msg.edit_text("🖱️ <b>'လော့ဂ်အင်' ခလုတ်ကို နှိပ်နေပါသည်...</b>")
-            
-            await page.evaluate("""
-                let buttons = document.querySelectorAll('button.active, .signIn__container-button button, .signIn__container-button');
-                for (let btn of buttons) {
-                    if (btn.innerText.includes('လော့ဂ်အင်') || btn.innerText.includes('Log in')) {
-                        btn.click();
-                        break;
-                    } else if (btn.tagName === 'DIV') {
-                        btn.click();
-                    }
-                }
-            """)
-            
-            await status_msg.edit_text("⏳ <b>ဝင်သွားရန် ၅ စက္ကန့် စောင့်နေပါသည်...</b>")
-            await page.wait_for_timeout(5000)
-
-            await status_msg.edit_text("📸 <b>Screenshot ရိုက်ကူးနေပါသည်...</b>")
-            await page.screenshot(path="test_result.png")
-            
-            if "login" not in page.url.lower():
-                await message.reply(f"✅ <b>ဝင်သွားပါပြီ! Login အောင်မြင်ပါသည်။</b>\nလက်ရှိ URL: {page.url}")
-            else:
-                await message.reply("❌ <b>Login မအောင်မြင်သေးပါ။ Screenshot ကို စစ်ဆေးကြည့်ပါ။</b>\nလက်ရှိ URL: " + page.url)
-                
-            if os.path.exists("test_result.png"):
-                photo = FSInputFile("test_result.png")
-                await bot.send_photo(message.chat.id, photo, caption="📸 နောက်ဆုံး ရောက်ရှိနေသော မျက်နှာပြင်")
-                os.remove("test_result.png")
-
-        except Exception as e:
-            # Error အတိအကျကို ပြန်ပို့ပေးမည်
-            await message.reply(f"⚠️ <b>အဓိက Error ဖြစ်သွားပါသည်:</b>\n<code>{str(e)}</code>")
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
+            )
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36",
+                viewport={'width': 390, 'height': 844}, 
+                is_mobile=True, 
+                has_touch=True  
+            )
+            page = await context.new_page()
             
             try:
-                await page.screenshot(path="test_error.png")
-                if os.path.exists("test_error.png"):
-                    photo = FSInputFile("test_error.png")
-                    await bot.send_photo(message.chat.id, photo, caption="📸 Error တက်သွားသော မျက်နှာပြင်")
-                    os.remove("test_error.png")
+                await message.reply("🌐 <b>၂. ဝဘ်ဆိုဒ်သို့ သွားနေပါသည်...</b>")
+                await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
+                await page.wait_for_timeout(3000)
+
+                await message.reply("📱 <b>၃. အချက်အလက်များ ရိုက်ထည့်နေပါသည်...</b>")
+                
+                # 🔧 Fix 1: JavaScript ကို Function အနေဖြင့် သေသေချာချာ ရေးသားခြင်း
+                js_code = """
+                ([user, pwd]) => {
+                    function setNativeValue(element, value) {
+                        if (!element) return false;
+                        const valueSetter = Object.getOwnPropertyDescriptor(element, 'value').set;
+                        const prototype = Object.getPrototypeOf(element);
+                        const prototypeValueSetter = Object.getOwnPropertyDescriptor(prototype, 'value').set;
+                        
+                        if (valueSetter && valueSetter !== prototypeValueSetter) {
+                            prototypeValueSetter.call(element, value);
+                        } else {
+                            valueSetter.call(element, value);
+                        }
+                        element.dispatchEvent(new Event('input', { bubbles: true }));
+                        element.dispatchEvent(new Event('change', { bubbles: true }));
+                        return true;
+                    }
+
+                    let phone = document.querySelector('input[name="userNumber"]');
+                    setNativeValue(phone, user);
+
+                    let pass = document.querySelector('input[placeholder="စကားဝှက်"]') || 
+                               document.querySelector('.passwordInput__container-input input') || 
+                               document.querySelector('input[type="password"]');
+                    setNativeValue(pass, pwd);
+                }
+                """
+                
+                # Function ထဲသို့ Argument များ (username, password) လှမ်းပို့ပေးခြင်း
+                await page.evaluate(js_code, [username, password])
+                await page.wait_for_timeout(1000)
+
+                await message.reply("🖱️ <b>၄. 'လော့ဂ်အင်' ခလုတ်ကို နှိပ်နေပါသည်...</b>")
+                
+                # ခလုတ်နှိပ်ခြင်းကိုလည်း Function အနေဖြင့် ပြောင်းရေးထားပါသည်
+                await page.evaluate("""
+                () => {
+                    let buttons = document.querySelectorAll('button.active, .signIn__container-button button, .signIn__container-button');
+                    for (let btn of buttons) {
+                        if (btn.innerText.includes('လော့ဂ်အင်') || btn.innerText.includes('Log in')) {
+                            btn.click();
+                            break;
+                        } else if (btn.tagName === 'DIV') {
+                            btn.click();
+                        }
+                    }
+                }
+                """)
+                
+                await message.reply("⏳ <b>၅. ဝင်သွားရန် ၅ စက္ကန့် စောင့်နေပါသည်...</b>")
+                await page.wait_for_timeout(5000)
+
+                await message.reply("📸 <b>၆. Screenshot ရိုက်ကူးနေပါသည်...</b>")
+                await page.screenshot(path="test_result.png")
+                
+                if "login" not in page.url.lower():
+                    await message.reply(f"✅ <b>ဝင်သွားပါပြီ! Login အောင်မြင်ပါသည်။</b>\nလက်ရှိ URL: {page.url}")
+                else:
+                    await message.reply("❌ <b>Login မအောင်မြင်သေးပါ။ Screenshot ကို စစ်ဆေးကြည့်ပါ။</b>\nလက်ရှိ URL: " + page.url)
+                    
+                if os.path.exists("test_result.png"):
+                    photo = FSInputFile("test_result.png")
+                    await bot.send_photo(message.chat.id, photo, caption="📸 နောက်ဆုံး ရောက်ရှိနေသော မျက်နှာပြင်")
+                    os.remove("test_result.png")
+
             except Exception as inner_e:
-                await message.reply(f"⚠️ <b>ဓာတ်ပုံရိုက်ရာတွင်လည်း Error ထပ်တက်ပါသည်:</b>\n<code>{str(inner_e)}</code>")
-            
-        finally:
-            await browser.close()
-            # ဤနေရာတွင် status_msg ကို မဖျက်တော့ပါ။ အဆုံးထိ ဘာဖြစ်သွားလဲ သိနိုင်ရန် ဖြစ်ပါသည်။
-            await status_msg.edit_text(status_msg.html_text + "\n\n🏁 <b>စမ်းသပ်မှု ပြီးဆုံးပါပြီ။ Browser ပိတ်လိုက်ပါပြီ။</b>")
+                # 🔧 Fix 2: Error များကို HTML Tag အဖြစ် မထင်စေရန် html.escape() ဖြင့် ကာကွယ်ခြင်း
+                safe_error = html.escape(str(inner_e))
+                await bot.send_message(message.chat.id, f"⚠️ <b>အတွင်းပိုင်း Error ဖြစ်သွားပါသည်:</b>\n<pre>{safe_error}</pre>")
+                
+                try:
+                    await page.screenshot(path="test_error.png")
+                    if os.path.exists("test_error.png"):
+                        photo = FSInputFile("test_error.png")
+                        await bot.send_photo(message.chat.id, photo, caption="📸 Error တက်သွားသော မျက်နှာပြင်")
+                        os.remove("test_error.png")
+                except:
+                    pass
+                
+            finally:
+                await browser.close()
+                await message.reply("🏁 <b>စမ်းသပ်မှု ပြီးဆုံးပါပြီ။ Browser ပိတ်လိုက်ပါပြီ။</b>")
+
+    except Exception as e:
+        safe_error = html.escape(str(e))
+        await bot.send_message(message.chat.id, f"🚨 <b>Browser စတင်ရန် ပျက်ကွက်ပါသည်:</b>\n<pre>{safe_error}</pre>")
 
 async def main():
     print("🚀 Login Test Bot စတင်နေပါပြီ...")
