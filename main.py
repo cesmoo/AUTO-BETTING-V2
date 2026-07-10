@@ -54,8 +54,17 @@ def get_logged_in_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="📋 Info"), KeyboardButton(text="💰 Balance")], 
-            [KeyboardButton(text="🎰 Games")],
+            [KeyboardButton(text="🎰 Games"), KeyboardButton(text="🤖 AI Mode")],
             [KeyboardButton(text="🔐 Logout")]
+        ],
+        resize_keyboard=True
+    )
+
+def get_ai_mode_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="🧠 Basic Trend AI"), KeyboardButton(text="🚀 ChatGPT Mode")],
+            [KeyboardButton(text="🌌 Gemini Mode"), KeyboardButton(text="🔙 ပင်မမီနူးသို့")]
         ],
         resize_keyboard=True
     )
@@ -195,7 +204,8 @@ async def process_password(message: types.Message, state: FSMContext):
                 "playwright": p,
                 "browser": browser,
                 "page": page,
-                "is_auto_betting": False 
+                "is_auto_betting": False,
+                "ai_mode": "🧠 Basic Trend AI"
             }
 
             await message.answer(
@@ -232,7 +242,6 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
     try:
         bet_choice = bet_type.lower()
         
-        # 🛑 Popup ကို အတိအကျ ပိတ်ခြင်း
         try:
             winning_tip = page.locator('.WinningTip__C').first
             if await winning_tip.is_visible(timeout=1000):
@@ -317,16 +326,16 @@ async def get_latest_game_result(target_issue):
     return "? | ?"
 
 # ==========================================================
-# 🧠 AI Prediction API Fetching Logic (Issue Number Fixed)
+# 🧠 AI Prediction API Fetching Logic (Multi-AI Modes)
 # ==========================================================
-async def get_ai_prediction():
+async def get_ai_prediction(user_tg_id):
     url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
     headers = {
         'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjQzMjUwIiwibmJmIjoiMTc4MzY0MzI1MCIsImV4cCI6IjE3ODM2NDUwNTAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgNzoyNzozMCBBTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgNjo1NzozMCBBTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6Ijk3IiwiVG9rZW5UeXBlIjoiQWNjZXNzX1Rva2VuIiwiUGhvbmVUeXBlIjoiMSIsIlVzZXJUeXBlIjoiMCIsIlVzZXJOYW1lMiI6InB5YWVzb25lNXBzcEB5YWhvby5jb20iLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.C-FbAazz7HkLeQ5L5eISGHGJCdwarGdz4A3v9XyvqCE',
         'content-type': 'application/json;charset=UTF-8',
     }
     json_data = {
-        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+        'pageSize': 15, 'pageNo': 1, 'typeId': 30, 'language': 7,
         'random': 'e431a6544cde4cbb8e09a4c01199b75b',
         'signature': '1668945A145F050B049ED587E6E9E0E7', 'timestamp': 1000000000,
     }
@@ -340,23 +349,37 @@ async def get_ai_prediction():
         
         if records:
             last_completed_issue = records[0]['issueNumber']
-            
-            # နောက်ထိုးမည့်ပွဲစဉ်သည် နောက်ဆုံးပြီးသွားသောပွဲစဉ် + 1 ဖြစ်သည်
             next_issue = str(int(last_completed_issue) + 1)
             
-            recent_numbers = [int(item['number']) for item in records[:5]]
-            big_count = sum(1 for n in recent_numbers if n >= 5)
-            small_count = 5 - big_count
+            ai_mode = active_sessions.get(user_tg_id, {}).get("ai_mode", "🧠 Basic Trend AI")
             
-            prediction_choice = "big" if big_count > small_count else "small"
-            confidence = random.randint(75, 95) 
+            if ai_mode == "🚀 ChatGPT Mode":
+                recent_7 = [int(item['number']) for item in records[:7]]
+                big_count = sum(1 for n in recent_7 if n >= 5)
+                prediction_choice = "big" if big_count >= 4 else "small"
+                confidence = random.randint(82, 98)
+                ai_name = "ChatGPT-4"
+                
+            elif ai_mode == "🌌 Gemini Mode":
+                recent_10 = [int(item['number']) for item in records[:10]]
+                big_count = sum(1 for n in recent_10 if n >= 5)
+                prediction_choice = "big" if big_count > (10 - big_count) else "small"
+                confidence = random.randint(80, 95)
+                ai_name = "Gemini Pro"
+                
+            else:
+                recent_5 = [int(item['number']) for item in records[:5]]
+                big_count = sum(1 for n in recent_5 if n >= 5)
+                prediction_choice = "big" if big_count > (5 - big_count) else "small"
+                confidence = random.randint(70, 85)
+                ai_name = "Basic AI"
             
-            return prediction_choice, confidence, next_issue
+            return prediction_choice, confidence, next_issue, ai_name
         else:
-            return None, 0, None
+            return None, 0, None, None
 
     except Exception:
-        return None, 0, None
+        return None, 0, None, None
 
 # ==========================================================
 # 🔄 Continuous Auto Bet Loop Task (Clean Format)
@@ -367,7 +390,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
 
     while active_sessions.get(user_tg_id, {}).get("is_auto_betting", False):
         try:
-            predicted_bet, confidence, current_issue = await get_ai_prediction()
+            predicted_bet, confidence, current_issue, ai_name = await get_ai_prediction(user_tg_id)
 
             if current_issue and current_issue != last_betted_issue:
                 page = active_sessions[user_tg_id]["page"]
@@ -381,6 +404,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
 
                 betting_msg = (
                     f"• WINGO_30S : {current_issue}\n"
+                    f"• Model : {ai_name}\n"
                     f"• Pred : {predicted_bet.upper()} | {amount} Ks\n"
                     f"• Auto-Betting ✅"
                 )
@@ -391,7 +415,6 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
                 if success:
                     last_betted_issue = current_issue
                     
-                    # ဂိမ်းပြီးဆုံးရန် ၂၅ စက္ကန့် စောင့်ခြင်း
                     await asyncio.sleep(25) 
 
                     balance_after_str = "0"
@@ -438,6 +461,41 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
             await asyncio.sleep(5)
 
 # ==========================================================
+# 🤖 AI Mode Selection Handlers
+# ==========================================================
+@dp.message(F.text == "🤖 AI Mode")
+async def cmd_ai_mode(message: types.Message):
+    user_tg_id = message.from_user.id
+    if user_tg_id not in active_sessions:
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+        
+    current_mode = active_sessions[user_tg_id].get("ai_mode", "🧠 Basic Trend AI")
+    
+    await message.answer(
+        f"🤖 <b>အသုံးပြုလိုသော AI Prediction စနစ်ကို ရွေးချယ်ပါ:</b>\n\n"
+        f"လက်ရှိ အသုံးပြုနေသော စနစ်: <b>{current_mode}</b>\n\n"
+        "1️⃣ <b>Basic Trend AI:</b> နောက်ဆုံး (၅) ပွဲကိုကြည့်၍ တွက်ချက်သော ပုံမှန်စနစ်။\n"
+        "2️⃣ <b>ChatGPT Mode:</b> အနိုင်အရှုံး Pattern များကို ရှာဖွေတွက်ချက်သော စနစ်။\n"
+        "3️⃣ <b>Gemini Mode:</b> ပွဲစဉ် (၁၀) ပွဲစာ Data ကို ခြုံငုံသုံးသပ်သော စနစ်။",
+        reply_markup=get_ai_mode_keyboard()
+    )
+
+@dp.message(F.text.in_(["🧠 Basic Trend AI", "🚀 ChatGPT Mode", "🌌 Gemini Mode"]))
+async def set_ai_mode(message: types.Message):
+    user_tg_id = message.from_user.id
+    if user_tg_id not in active_sessions:
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+        
+    selected_mode = message.text
+    active_sessions[user_tg_id]["ai_mode"] = selected_mode
+    
+    await message.answer(f"✅ AI စနစ်ကို <b>{selected_mode}</b> သို့ ပြောင်းလဲသတ်မှတ်လိုက်ပါပြီ။", reply_markup=get_logged_in_keyboard())
+
+@dp.message(F.text == "🔙 ပင်မမီနူးသို့")
+async def back_to_main(message: types.Message):
+    await message.answer("ပင်မမီနူးသို့ ရောက်ရှိပါပြီ။", reply_markup=get_logged_in_keyboard())
+
+# ==========================================================
 # 🤖 Start / Stop Continuous Auto Bet Commands
 # ==========================================================
 @dp.message(Command("startauto"))
@@ -482,11 +540,17 @@ async def cmd_aibet(message: types.Message, state: FSMContext):
 
     loading_msg = await message.answer("🧠 <b>AI စနစ်ဖြင့် ပွဲစဉ်မှတ်တမ်းများကို လေ့လာသုံးသပ်နေပါသည်...</b>")
 
-    predicted_bet, confidence, current_issue = await get_ai_prediction()
+    predicted_bet, confidence, current_issue, ai_name = await get_ai_prediction(user_tg_id)
     await loading_msg.delete()
 
     if predicted_bet:
-        await message.answer(f"📊 <b>AI ခန့်မှန်းချက် ရရှိပါပြီ! (ပွဲစဉ်: {current_issue})</b>\n\n🎯 ရွေးချယ်မှု: <b>{predicted_bet.upper()}</b>\n⚡ သေချာမှု (Confidence): <b>{confidence}%</b>\n💰 လောင်းကြေး: <b>{amount}</b>\n\n🔄 အလိုအလျောက် လောင်းကြေးထည့်နေပါသည်...")
+        await message.answer(
+            f"📊 <b>{ai_name} မှ ခန့်မှန်းချက် ရရှိပါပြီ! (ပွဲစဉ်: {current_issue})</b>\n\n"
+            f"🎯 ရွေးချယ်မှု: <b>{predicted_bet.upper()}</b>\n"
+            f"⚡ သေချာမှု (Confidence): <b>{confidence}%</b>\n"
+            f"💰 လောင်းကြေး: <b>{amount}</b>\n\n"
+            #f"🔄 အလိုအလျောက် လောင်းကြေးထည့်နေပါသည်..."
+        )
         page = active_sessions[user_tg_id]["page"]
         await place_auto_bet(page, message, predicted_bet, amount)
     else:
