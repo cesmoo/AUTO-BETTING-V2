@@ -28,6 +28,23 @@ import database as db
 # AI Engines များကို ချိတ်ဆက်ခြင်း
 import ai_engines
 
+# ==========================================================
+# 🎡 Circle Rnd AI ကို bot.py မှတစ်ဆင့် ထည့်သွင်းခြင်း
+# ==========================================================
+def circle_rnd_predict(history_docs):
+    wheel = ["BIG", "SMALL", "BIG", "SMALL", "BIG", "SMALL", "BIG", "SMALL"]
+    predicted = random.choice(wheel)
+    emoji = "🔴" if predicted == "BIG" else "🟢"
+    confidence = round(random.uniform(50.0, 65.0), 1)
+    return predicted, f"{predicted} ({'အကြီး' if predicted == 'BIG' else 'အသေး'}) {emoji}", confidence, "🎡 Circle Rnd: Spinner"
+
+# ai_engines ၏ Dictionary ထဲသို့ အသစ်ပေါင်းထည့်ခြင်း
+ai_engines.AI_MODES["circle_rnd"] = {
+    "func": circle_rnd_predict,
+    "name": "🎡 Circle Rnd",
+    "desc": "Random Wheel Spin"
+}
+
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -263,8 +280,8 @@ async def process_password(message: types.Message, state: FSMContext):
                 "start_balance": 0.0,
                 "hit_wait": 0,
                 "current_misses": 0,
-                "is_ai_prediction_enabled": False, # 🔮 AI Prediction Toggle State
-                "last_predicted_issue": None       # 🔮 Tracking issue
+                "is_ai_prediction_enabled": False, 
+                "last_predicted_issue": None       
             }
 
             await message.answer("𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦", reply_markup=get_logged_in_keyboard())
@@ -320,12 +337,11 @@ async def process_toggle_aipred(callback: types.CallbackQuery):
     
     if new_state:
         await callback.answer("✅ AI Prediction ပြသခြင်းကို ဖွင့်လိုက်ပါပြီ။", show_alert=True)
-        # စနစ်ဖွင့်လိုက်ပါက Prediction Loop ကို စတင်မည်
         asyncio.create_task(prediction_broadcast_loop(user_tg_id, callback.message))
     else:
         await callback.answer("❌ AI Prediction ပြသခြင်းကို ပိတ်လိုက်ပါပြီ။", show_alert=True)
 
-# 🔮 Broadcast Loop (Only prints prediction, NO PLACE BET)
+# 🔮 Broadcast Loop (Only prints prediction, NO PLACE BET, Includes Win/Lose Check)
 async def prediction_broadcast_loop(user_tg_id, message: types.Message):
     api_error_count = 0
     while active_sessions.get(user_tg_id, {}).get("is_ai_prediction_enabled", False):
@@ -338,16 +354,50 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                 if current_issue != last_issue:
                     active_sessions[user_tg_id]["last_predicted_issue"] = current_issue
                     
-                    await message.answer(
+                    pred_msg = await message.answer(
                         f"🔮 <b>AI Prediction (Live)</b>\n"
                         f"━━━━━━━━━━━━━━━\n"
                         f"• WINGO_30S : <code>{current_issue}</code>\n"
                         f"• Model : {ai_name}\n"
                         f"• Prediction : <b>{predicted_bet.upper()}</b>\n"
-                        f"• Confidence : {confidence:.1f}%\n\n"
+                        f"• Confidence : {confidence:.1f}%\n"
+                        f"• Status : ⏳ <b>Waiting for result...</b>\n\n"
                         f"<i>(⚠️ မှတ်ချက်: ဤစနစ်သည် ခန့်မှန်းချက်ကိုသာ ပြသပြီး လောင်းကြေးထည့်မည် မဟုတ်ပါ။)</i>"
                     )
-                    await asyncio.sleep(20)  # Next game usually takes 30s, wait 20s to avoid spam
+                    
+                    actual_result = "? | ?"
+                    for _ in range(20):
+                        if not active_sessions.get(user_tg_id, {}).get("is_ai_prediction_enabled", False):
+                            break
+                        await asyncio.sleep(2)
+                        actual_result = await get_latest_game_result(current_issue)
+                        if actual_result != "? | ?":
+                            break
+                    
+                    if actual_result != "? | ?":
+                        actual_size = actual_result.split(" | ")[1].strip().lower()
+                        if predicted_bet.lower() == actual_size:
+                            status_text = f"✅ <b>WIN ({actual_result})</b>"
+                        else:
+                            status_text = f"❌ <b>LOSE ({actual_result})</b>"
+                    else:
+                        status_text = "⚖️ <b>DRAW (Timeout)</b>"
+                        
+                    try:
+                        await pred_msg.edit_text(
+                            f"🔮 <b>AI Prediction (Live)</b>\n"
+                            f"━━━━━━━━━━━━━━━\n"
+                            f"• WINGO_30S : <code>{current_issue}</code>\n"
+                            f"• Model : {ai_name}\n"
+                            f"• Prediction : <b>{predicted_bet.upper()}</b>\n"
+                            f"• Confidence : {confidence:.1f}%\n"
+                            f"• Status : {status_text}\n\n"
+                            f"<i>(⚠️ မှတ်ချက်: ဤစနစ်သည် ခန့်မှန်းချက်ကိုသာ ပြသပြီး လောင်းကြေးထည့်မည် မဟုတ်ပါ။)</i>"
+                        )
+                    except:
+                        pass
+                    
+                    await asyncio.sleep(2)
                 else:
                     await asyncio.sleep(2)
             else:
@@ -560,7 +610,7 @@ async def get_latest_game_result(target_issue):
     json_data = {
         'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
         'random': '7bc385b8267d48ebbc62fe04296cbed4',
-        'signature': '2B34898B971F29208D293D1E530F8627', 'timestamp': 1783665931,
+        'signature': '2B34898B971F29208D293D1E530F8627', 'timestamp': int(time.time()),
     }
     try:
         async with aiohttp.ClientSession() as session:
@@ -585,9 +635,9 @@ async def get_ai_prediction(user_tg_id):
         'content-type': 'application/json;charset=UTF-8',
     }
     json_data = {
-        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+        'pageSize': 30, 'pageNo': 1, 'typeId': 30, 'language': 7,
         'random': 'e431a6544cde4cbb8e09a4c01199b75b',
-        'signature': '1668945A145F050B049ED587E6E9E0E7', 'timestamp': 1000000000,
+        'signature': '1668945A145F050B049ED587E6E9E0E7', 'timestamp': int(time.time()),
     }
 
     try:
@@ -707,11 +757,12 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                     )
                     await message.answer(betting_msg)
 
+                    # 👈 Error ကြောင့် စာနှစ်ခါ မထွက်စေရန် ဤနေရာတွင် ကြိုမှတ်ပါမည်
+                    last_betted_issue = current_issue
+
                     success = await place_auto_bet(page, message, predicted_bet, current_amount, silent=True)
                     
                     if success:
-                        last_betted_issue = current_issue
-                        
                         actual_result = "? | ?"
                         for _ in range(20): 
                             if not active_sessions.get(user_tg_id, {}).get("is_auto_betting", False):
@@ -749,19 +800,22 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                                 if active_sessions[user_tg_id]["current_bet_step"] >= len(sequence):
                                     active_sessions[user_tg_id]["current_bet_step"] = 0
                                 
+                            # 👈 Profit အရင်တွက်ချက်မည်
+                            start_bal = active_sessions[user_tg_id].get("start_balance", new_bal_val)
+                            profit_target = active_sessions[user_tg_id].get("profit_target", 0)
+                            current_profit = new_bal_val - start_bal
+                            profit_display = f"+{current_profit:,.2f} Ks" if current_profit > 0 else f"{current_profit:,.2f} Ks"
+                            
                             result_msg = (
                                 f"{status_title}\n"
                                 f"━━━━━━━━━━━━━━━\n"
                                 f"• WINGO_30S : {current_issue}\n"
                                 f"• Result : {actual_result}\n"
-                                f"• Balance : {balance_after_str}"
+                                f"• Balance : {balance_after_str}\n"
+                                f"• Profit : {profit_display}"
                             )
                             await message.answer(result_msg)
                             await db.update_user_balance(user_tg_id, balance_after_str.strip())
-                            
-                            start_bal = active_sessions[user_tg_id].get("start_balance", new_bal_val)
-                            profit_target = active_sessions[user_tg_id].get("profit_target", 0)
-                            current_profit = new_bal_val - start_bal
                             
                             if profit_target > 0 and current_profit >= profit_target:
                                 await message.answer(
