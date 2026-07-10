@@ -1,6 +1,7 @@
 # ai_engines.py
 import numpy as np
 import time
+import random
 
 class AIEmoji:
     CHECK = "✅"; CROSS = "❌"; INFO = "ℹ️"; HOURGLASS = "⏳"
