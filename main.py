@@ -610,7 +610,7 @@ async def get_latest_game_result(target_issue):
     json_data = {
         'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
         'random': '7bc385b8267d48ebbc62fe04296cbed4',
-        'signature': '2B34898B971F29208D293D1E530F8627', 'timestamp': int(time.time()),
+        'signature': '2B34898B971F29208D293D1E530F8627', 'timestamp': 1783665931,
     }
     try:
         async with aiohttp.ClientSession() as session:
@@ -635,9 +635,9 @@ async def get_ai_prediction(user_tg_id):
         'content-type': 'application/json;charset=UTF-8',
     }
     json_data = {
-        'pageSize': 30, 'pageNo': 1, 'typeId': 30, 'language': 7,
+        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
         'random': 'e431a6544cde4cbb8e09a4c01199b75b',
-        'signature': '1668945A145F050B049ED587E6E9E0E7', 'timestamp': int(time.time()),
+        'signature': '1668945A145F050B049ED587E6E9E0E7', 'timestamp': 1000000000,
     }
 
     try:
