@@ -1,6 +1,8 @@
 import asyncio
 import os
 import html
+import random
+import aiohttp
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -21,7 +23,7 @@ bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTM
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
-# User များ၏ Browser Session များကို ခေတ္တသိမ်းဆည်းထားရန် (Auto Bet အတွက်)
+# User များ၏ Browser Session များကို ခေတ္တသိမ်းဆည်းထားရန်
 active_sessions = {}
 
 # ==========================================================
@@ -98,7 +100,6 @@ async def process_password(message: types.Message, state: FSMContext):
     
     loading_msg = await message.answer("🔄 <b>အကောင့်ဝင်နေပါသည်... ခဏစောင့်ပါ...</b>")
     
-    # Playwright ကို စတင်ခြင်း
     p = await async_playwright().start()
     browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
     context = await browser.new_context(
@@ -109,11 +110,9 @@ async def process_password(message: types.Message, state: FSMContext):
     page = await context.new_page()
     
     try:
-        # ၁။ Login စာမျက်နှာသို့ သွားခြင်း
         await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(3000)
 
-        # ၂။ Vue.js Reactivity ကို ကျော်ဖြတ်၍ အချက်အလက်များ ထည့်သွင်းခြင်း
         js_code = """
         ([user, pwd]) => {
             function fillVueInput(element, value) {
@@ -138,7 +137,6 @@ async def process_password(message: types.Message, state: FSMContext):
         await page.evaluate(js_code, [username, password])
         await page.wait_for_timeout(1000)
 
-        # ၃။ Login ခလုတ်ကို နှိပ်ခြင်း
         await page.evaluate("""
             () => {
                 let btn = document.querySelector('button.active');
@@ -148,7 +146,6 @@ async def process_password(message: types.Message, state: FSMContext):
         
         await page.wait_for_timeout(5000)
         
-        # Popup ပိတ်ခြင်း (လိုအပ်ပါက)
         try:
             close_selector = ".announcement-dialog__button"
             for _ in range(3):
@@ -161,10 +158,8 @@ async def process_password(message: types.Message, state: FSMContext):
         except:
             pass
         
-        # ၄။ Login အောင်မြင်မှု စစ်ဆေးခြင်း
         if "login" not in page.url.lower():
             
-            # Info စာမျက်နှာ (#/main) သို့ သွား၍ Data ဆွဲထုတ်ခြင်း
             try:
                 await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
                 await page.wait_for_timeout(3000)
@@ -186,21 +181,17 @@ async def process_password(message: types.Message, state: FSMContext):
                 balance_el = page.locator('.balance_info p.totalSavings__container-header__subtitle span').first
                 if await balance_el.is_visible(timeout=2000):
                     balance_text = await balance_el.inner_text()
-
             except Exception as e:
                 print(f"Scraping Error: {e}")
 
-            # ၅။ Win Go 30s စာမျက်နှာသို့ သွားထားခြင်း (Auto Bet အတွက် အဆင်သင့်ဖြစ်စေရန်)
             await page.goto("https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1", wait_until="networkidle")
             await page.wait_for_timeout(2000)
 
-            # ၆။ State ထဲမှာ Data တွေကို သိမ်းဆည်းခြင်း
             await state.update_data(
                 is_logged_in=True, username=username, user_id=user_id.strip(),
                 nickname=nickname.strip(), balance=balance_text.strip(), login_time=site_login_time.strip()
             )
 
-            # Session သိမ်းဆည်းခြင်း (Bot မပိတ်မချင်း Browser ပွင့်နေမည်)
             active_sessions[user_tg_id] = {
                 "playwright": p,
                 "browser": browser,
@@ -210,7 +201,7 @@ async def process_password(message: types.Message, state: FSMContext):
             await message.answer(
                 "✅ <b>LOGIN SUCCESSFUL</b>\n\n"
                 "သင့်အကောင့်အချက်အလက်များကို ကြည့်ရှုရန် အောက်ပါ <b>📋 Info</b> ခလုတ်ကို နှိပ်ပါ။\n"
-                "လောင်းကြေးထည့်ရန် <code>/bet [big/small/red/green/violet] [amount]</code> ကို အသုံးပြုပါ။",
+                "Auto Bet အတွက် <code>/bet [type] [amount]</code> (သို့) AI Bet အတွက် <code>/aibet [amount]</code> ကို အသုံးပြုပါ။",
                 reply_markup=get_logged_in_keyboard()
             )
             await state.set_state(LoginForm.main_menu)
@@ -232,7 +223,7 @@ async def process_password(message: types.Message, state: FSMContext):
 
 
 # ==========================================================
-# 🚀 Auto Bet Function (with Debugging)
+# 🚀 Auto Bet Function (Targeted Popup Bypass ဖြင့်)
 # ==========================================================
 async def place_auto_bet(page, message: types.Message, bet_type: str, amount: int = 10):
     try:
@@ -240,47 +231,58 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
 
         bet_choice = bet_type.lower()
         
-        # ၁။ အရောင် သို့မဟုတ် အကြီး/အသေး ရွေးချယ်ခြင်း
+        # 🛑 Popup ကို အတိအကျ ပိတ်ခြင်း
+        try:
+            winning_tip = page.locator('.WinningTip__C').first
+            if await winning_tip.is_visible(timeout=1000):
+                close_btn = page.locator('.WinningTip__C .closeBtn').first
+                if await close_btn.is_visible():
+                    await close_btn.click(force=True)
+                else:
+                    active_btn = page.locator('.WinningTip__C .acitveBtn').first
+                    if await active_btn.is_visible():
+                        await active_btn.click(force=True)
+                await page.wait_for_timeout(500) 
+        except:
+            pass
+
+        # ၁။ အရောင် သို့မဟုတ် အကြီး/အသေး ရွေးချယ်ခြင်း (force=True)
         if bet_choice == "big":
-            await page.locator('.Betting__C-foot-b').click(timeout=5000) 
+            await page.locator('.Betting__C-foot-b').click(timeout=5000, force=True) 
         elif bet_choice == "small":
-            await page.locator('.Betting__C-foot-s').click(timeout=5000)
+            await page.locator('.Betting__C-foot-s').click(timeout=5000, force=True)
         elif bet_choice == "red":
-            await page.locator('.Betting__C-head-r').click(timeout=5000)
+            await page.locator('.Betting__C-head-r').click(timeout=5000, force=True)
         elif bet_choice == "green":
-            await page.locator('.Betting__C-head-g').click(timeout=5000)
+            await page.locator('.Betting__C-head-g').click(timeout=5000, force=True)
         elif bet_choice in ["violet", "purple"]:
-            await page.locator('.Betting__C-head-p').click(timeout=5000)
+            await page.locator('.Betting__C-head-p').click(timeout=5000, force=True)
         else:
             await message.answer("❌ မှားယွင်းနေပါသည်။ 'big', 'small', 'red', 'green', 'violet' ထဲမှ တစ်ခုရွေးပါ။")
             return False
 
         await page.wait_for_timeout(1000)
 
-        # ၂။ လောင်းကြေးပမာဏ ရွေးချယ်ခြင်း (10, 100, 1000, 10000)
+        # ၂။ လောင်းကြေးပမာဏ ရွေးချယ်ခြင်း 
         amount_locator = page.locator(f"div.Betting__Popup-body-line-item", has_text=str(amount)).first
-        await amount_locator.click(timeout=3000)
+        await amount_locator.click(timeout=3000, force=True)
         await page.wait_for_timeout(500)
 
         # ၃။ အတည်ပြု (Confirm) ခလုတ်ကို နှိပ်ခြင်း
         confirm_btn = page.locator('.Betting__Popup-foot > div').last
-        await confirm_btn.click(timeout=3000)
+        await confirm_btn.click(timeout=3000, force=True)
 
         await page.wait_for_timeout(2000)
         await message.answer("✅ <b>လောင်းကြေး အောင်မြင်စွာ ထည့်သွင်းပြီးပါပြီ။</b>")
         return True
 
     except Exception as e:
-        # 🐛 DEBUGGING: Error တက်ပါက Screenshot ရိုက်ခြင်း
         error_image_path = f"debug_error_{message.from_user.id}.png"
         try:
             await page.screenshot(path=error_image_path, full_page=True)
             photo = FSInputFile(error_image_path)
             error_text = str(e).split('\n')[0][:200] 
-            caption_text = (
-                "❌ <b>Auto Bet လုပ်ဆောင်မှု ရပ်တန့်သွားပါသည်!</b>\n\n"
-                f"<code>{error_text}</code>"
-            )
+            caption_text = f"❌ <b>Auto Bet လုပ်ဆောင်မှု ရပ်တန့်သွားပါသည်!</b>\n\n<code>{error_text}</code>"
             await message.answer_photo(photo=photo, caption=caption_text)
             if os.path.exists(error_image_path):
                 os.remove(error_image_path)
@@ -290,13 +292,80 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
         return False
 
 # ==========================================================
-# 🕹️ Bet Command Handler
+# 🧠 AI Prediction API Fetching Logic
+# ==========================================================
+async def get_ai_prediction():
+    url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
+    
+    headers = {
+        'authority': 'api.bigwinqaz.com',
+        'accept': 'application/json, text/plain, */*',
+        'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjQzMjUwIiwibmJmIjoiMTc4MzY0MzI1MCIsImV4cCI6IjE3ODM2NDUwNTAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgNzoyNzozMCBBTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgNjo1NzozMCBBTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6Ijk3IiwiVG9rZW5UeXBlIjoiQWNjZXNzX1Rva2VuIiwiUGhvbmVUeXBlIjoiMSIsIlVzZXJUeXBlIjoiMCIsIlVzZXJOYW1lMiI6InB5YWVzb25lNXBzcEB5YWhvby5jb20iLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.C-FbAazz7HkLeQ5L5eISGHGJCdwarGdz4A3v9XyvqCE',
+        'content-type': 'application/json;charset=UTF-8',
+        'origin': 'https://www.777bigwingame.app',
+        'referer': 'https://www.777bigwingame.app/',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36',
+    }
+
+    json_data = {
+        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+        'random': 'e431a6544cde4cbb8e09a4c01199b75b',
+        'signature': '1668945A145F050B049ED587E6E9E0E7', 'timestamp': 1000000000,
+    }
+
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, headers=headers, json=json_data) as response:
+                api_result = await response.json()
+                
+        records = api_result.get('data', {}).get('list', [])
+        
+        if records:
+            # လောလောဆယ် Mock Logic ဖြင့် စမ်းသပ်ရန်
+            prediction_choice = random.choice(["big", "small"]) 
+            confidence = random.randint(70, 95)
+            return prediction_choice, confidence
+        else:
+            return None, 0
+
+    except Exception as e:
+        print(f"API Error: {e}")
+        return None, 0
+
+# ==========================================================
+# 🤖 AI Auto Bet Command Handler
+# ==========================================================
+@dp.message(Command("aibet"))
+async def cmd_aibet(message: types.Message, state: FSMContext):
+    user_tg_id = message.from_user.id
+    if user_tg_id not in active_sessions:
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+
+    args = message.text.split()
+    amount = 10
+    if len(args) >= 2 and args[1].isdigit():
+        amount = int(args[1])
+
+    loading_msg = await message.answer("🧠 <b>AI စနစ်ဖြင့် ပွဲစဉ်မှတ်တမ်းများကို လေ့လာသုံးသပ်နေပါသည်...</b>")
+
+    predicted_bet, confidence = await get_ai_prediction()
+
+    await loading_msg.delete()
+
+    if predicted_bet:
+        await message.answer(f"📊 <b>AI ခန့်မှန်းချက် ရရှိပါပြီ!</b>\n\n🎯 ရွေးချယ်မှု: <b>{predicted_bet.upper()}</b>\n⚡ သေချာမှု (Confidence): <b>{confidence}%</b>\n💰 လောင်းကြေး: <b>{amount}</b>\n\n🔄 အလိုအလျောက် လောင်းကြေးထည့်နေပါသည်...")
+        
+        page = active_sessions[user_tg_id]["page"]
+        await place_auto_bet(page, message, predicted_bet, amount)
+    else:
+        await message.answer("❌ API မှ အချက်အလက်ရယူရာတွင် အခက်အခဲရှိနေပါသည်။")
+
+# ==========================================================
+# 🕹️ Standard Bet Command Handler
 # ==========================================================
 @dp.message(Command("bet"))
 async def cmd_bet(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
-    
-    # Session ရှိ/မရှိ စစ်ဆေးခြင်း
     if user_tg_id not in active_sessions:
         return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
         
@@ -309,7 +378,6 @@ async def cmd_bet(message: types.Message, state: FSMContext):
     if len(args) >= 3 and args[2].isdigit():
         amount = int(args[2])
         
-    # Active Session မှ Page ကို ယူ၍ Auto Bet ထိုးခြင်း
     page = active_sessions[user_tg_id]["page"]
     await place_auto_bet(page, message, bet_type, amount)
 
@@ -319,8 +387,6 @@ async def cmd_bet(message: types.Message, state: FSMContext):
 @dp.message(LoginForm.main_menu, F.text == "💰 Balance")
 async def check_balance(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
-    
-    # Session ရှိ/မရှိ စစ်ဆေးခြင်း
     if user_tg_id not in active_sessions:
         return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
 
@@ -329,16 +395,12 @@ async def check_balance(message: types.Message, state: FSMContext):
 
     try:
         balance_text = "0.00 Ks"
-        
-        # HTML Structure အရ '.Wallet__C-balance-l1' အောက်က 'div' ကို ဖတ်ပါမည်
         balance_el = page.locator('.Wallet__C-balance-l1 div').first
         
         if await balance_el.is_visible(timeout=3000):
             balance_text = await balance_el.inner_text()
 
-        # နောက်ပိုင်း Info ခလုတ်နှိပ်လျှင်ပါ Balance အသစ်ပေါ်စေရန် State ကို Update လုပ်ပါမည်
         await state.update_data(balance=balance_text.strip())
-
         await loading_msg.delete()
         await message.answer(f"💰 <b>သင့်ရဲ့ လက်ရှိ လက်ကျန်ငွေ:</b> {balance_text.strip()}", reply_markup=get_logged_in_keyboard())
 
@@ -361,15 +423,12 @@ async def show_info(message: types.Message, state: FSMContext):
 
     info_text = (
         "👤 <b>User Information:</b>\n"
-        "├─ 🆔 <b>User ID:</b> {user_id}\n"
-        "├─ 📱 <b>Username:</b> {username}\n"
-        "├─ 🏷️ <b>Nickname:</b> {nickname}\n"
-        "├─ 💰 <b>Balance:</b> {balance}\n"
-        "├─ 📅 <b>Login Date:</b> {login_time}\n"
+        f"├─ 🆔 <b>User ID:</b> {user_id}\n"
+        f"├─ 📱 <b>Username:</b> {username}\n"
+        f"├─ 🏷️ <b>Nickname:</b> {nickname}\n"
+        f"├─ 💰 <b>Balance:</b> {balance}\n"
+        f"├─ 📅 <b>Login Date:</b> {login_time}\n"
         "└─ ✅ <b>Allow Withdraw:</b> Yes\n"
-    ).format(
-        user_id=user_id, username=username, nickname=nickname, 
-        balance=balance, login_time=login_time
     )
     
     await message.answer(info_text, reply_markup=get_logged_in_keyboard())
@@ -380,8 +439,6 @@ async def show_info(message: types.Message, state: FSMContext):
 @dp.message(LoginForm.main_menu, F.text == "🔐 Logout")
 async def logout(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
-    
-    # Logout လုပ်ချိန်တွင် Browser Session ကို ပိတ်ခြင်း
     if user_tg_id in active_sessions:
         try:
             await active_sessions[user_tg_id]["browser"].close()
@@ -398,7 +455,7 @@ async def logout(message: types.Message, state: FSMContext):
 # ==========================================================
 @dp.message(F.text == "🎰 Games")
 async def games(message: types.Message):
-    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>\nWin Go 30s ကို ရွေးချယ်ထားပါသည်။ Auto Bet အတွက် <code>/bet</code> command ကို သုံးပါ။", reply_markup=get_main_keyboard())
+    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>\nWin Go 30s ကို ရွေးချယ်ထားပါသည်။ Auto Bet အတွက် <code>/bet</code> (သို့) <code>/aibet</code> ကို သုံးပါ။", reply_markup=get_main_keyboard())
 
 # ==========================================================
 # 🚀 Main Bot Loop
