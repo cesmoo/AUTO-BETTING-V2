@@ -232,6 +232,7 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
     try:
         bet_choice = bet_type.lower()
         
+        # 🛑 Popup ကို အတိအကျ ပိတ်ခြင်း
         try:
             winning_tip = page.locator('.WinningTip__C').first
             if await winning_tip.is_visible(timeout=1000):
@@ -340,7 +341,7 @@ async def get_ai_prediction():
         if records:
             last_completed_issue = records[0]['issueNumber']
             
-            # 🛑 ပြင်ဆင်ချက်: နောက်ထိုးမည့်ပွဲစဉ်သည် နောက်ဆုံးပြီးသွားသောပွဲစဉ် + 1 ဖြစ်သည်
+            # နောက်ထိုးမည့်ပွဲစဉ်သည် နောက်ဆုံးပြီးသွားသောပွဲစဉ် + 1 ဖြစ်သည်
             next_issue = str(int(last_completed_issue) + 1)
             
             recent_numbers = [int(item['number']) for item in records[:5]]
