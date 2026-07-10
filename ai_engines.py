@@ -317,6 +317,21 @@ def ml_style_predict(history_docs):
         last = recent[-1]; emoji = "🔴" if last == "BIG" else "🟢"
         return last, f"{last} ({'အကြီး' if last == 'BIG' else 'အသေး'}) {emoji}", 55.0, f"🧪 ML Style: Neutral {score:.3f}"
 
+# ========== 17. CIRCLE RND AI (Wheel Spinner) ==========
+def circle_rnd_predict(history_docs):
+    # စက်ဝိုင်းထဲတွင် ပါဝင်မည့် အကွက်များ
+    wheel = ["BIG", "SMALL", "BIG", "SMALL", "BIG", "SMALL", "BIG", "SMALL"]
+    
+    # Random လှည့်ပြီး တစ်ခုကို ရွေးချယ်ခြင်း
+    predicted = random.choice(wheel)
+    
+    emoji = "🔴" if predicted == "BIG" else "🟢"
+    
+    # 50/50 ကံစမ်းတာဖြစ်လို့ Confidence ကို 50% ဝန်းကျင် Random ပြပေးပါမည်
+    confidence = round(random.uniform(50.0, 65.0), 1)
+    
+    return predicted, f"{predicted} ({'အကြီး' if predicted == 'BIG' else 'အသေး'}) {emoji}", confidence, f"🎡 Circle Rnd: Spinner"
+
 # ========== AI MODES DICTIONARY ==========
 AI_MODES = {
     "pattern": {"func": pattern_predict, "name": "🎯 Pattern AI", "desc": "Pattern Auto-Switch"},
@@ -335,6 +350,7 @@ AI_MODES = {
     "bayesian": {"func": bayesian_predict, "name": "📐 Bayesian AI", "desc": "Conditional Probability"},
     "markov_chain": {"func": markov_chain_predict, "name": "🔗 Markov Chain", "desc": "Transition Matrix"},
     "ml_style": {"func": ml_style_predict, "name": "🧪 ML Style AI", "desc": "Weighted Features"},
+    "circle_rnd": {"func": circle_rnd_predict, "name": "🎡 Circle Rnd", "desc": "Random Wheel Spin"},
 }
 
 def get_prediction(history_docs, mode):
