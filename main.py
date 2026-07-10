@@ -80,7 +80,8 @@ def get_logged_in_keyboard():
             [KeyboardButton(text="📋 Info"), KeyboardButton(text="💰 Balance"), KeyboardButton(text="📊 Status")], 
             [KeyboardButton(text="▶️ Start Auto-Bet"), KeyboardButton(text="🛑 Stop Auto-Bet")],
             [KeyboardButton(text="🎰 Games"), KeyboardButton(text="🤖 AI Mode")],
-            [KeyboardButton(text="⚙️ Set Bet-Size"), KeyboardButton(text="🎯 Profit Target"), KeyboardButton(text="🎯 Hit Betting")], 
+            [KeyboardButton(text="⚙️ Set Bet-Size"), KeyboardButton(text="🎯 Profit Target")], 
+            [KeyboardButton(text="🎯 Hit Betting"), KeyboardButton(text="🔮 AI Prediction")],
             [KeyboardButton(text="🔐 Logout")]
         ],
         resize_keyboard=True
@@ -100,39 +101,31 @@ def get_ai_mode_keyboard():
     keyboard.append([KeyboardButton(text="🔙 ပင်မမီနူးသို့")])
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
+# 🎯 Hit Betting Inline Keyboard (with Colors)
 def get_hit_betting_inline_keyboard(current_wait: int = 0):
     keyboard = []
-    
-    # Numbers 1 to 9
     number_buttons = []
     for i in range(1, 10):
-        # ရွေးချယ်ထားသော နံပါတ်ဆိုလျှင် "success" (အစိမ်း)၊ မဟုတ်လျှင် "primary" (အပြာ)
         btn_style = "success" if current_wait == i else "primary"
-        
         number_buttons.append(
-            InlineKeyboardButton(
-                text=str(i), 
-                callback_data=f"hitbet_{i}",
-                style=btn_style  # အရောင်သတ်မှတ်ချက်
-            )
+            InlineKeyboardButton(text=str(i), callback_data=f"hitbet_{i}", style=btn_style)
         )
-        
-    # နံပါတ်များကို ၃ ခုစီ ခွဲပြီး 3x3 Grid အနေဖြင့် စီရန်
     for i in range(0, 9, 3):
         keyboard.append(number_buttons[i:i+3])
         
-    # 0 Button (Disable) ကို အောက်ဆုံးတွင် ထားရန်
     disable_text = "0 (Disabled)" if current_wait == 0 else "0 (Disable)"
-    
     keyboard.append([
-        InlineKeyboardButton(
-            text=disable_text, 
-            callback_data="hitbet_0",
-            style="danger"  # အနီရောင်အတွက် "danger"
-        )
+        InlineKeyboardButton(text=disable_text, callback_data="hitbet_0", style="danger")
     ])
-        
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+# 🔮 AI Prediction Toggle Keyboard (with Colors)
+def get_ai_prediction_toggle_keyboard(is_enabled: bool):
+    if is_enabled:
+        btn = InlineKeyboardButton(text="🟢 Enabled", callback_data="toggle_aipred", style="success")
+    else:
+        btn = InlineKeyboardButton(text="🔴 Disabled", callback_data="toggle_aipred", style="danger")
+    return InlineKeyboardMarkup(inline_keyboard=[[btn]])
 
 VALID_AI_NAMES = [m["name"] for m in ai_engines.AI_MODES.values()]
 
@@ -162,7 +155,7 @@ async def process_site(message: types.Message, state: FSMContext):
 async def process_phone(message: types.Message, state: FSMContext):
     await state.update_data(phone=message.text)
     await state.set_state(LoginForm.enter_password)
-    await message.answer("ᴘʟᴇᴀꜱᴇ ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘᴀꜱহ্যဝါဒ", reply_markup=ReplyKeyboardRemove())
+    await message.answer("ᴘʟᴇᴀꜱᴇ ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘᴀꜱꜱᴡᴏʀᴅ", reply_markup=ReplyKeyboardRemove())
 
 # ==========================================================
 # 🔥 Playwright Logic: Login & Database Save
@@ -269,7 +262,9 @@ async def process_password(message: types.Message, state: FSMContext):
                 "profit_target": 0,             
                 "start_balance": 0.0,
                 "hit_wait": 0,
-                "current_misses": 0
+                "current_misses": 0,
+                "is_ai_prediction_enabled": False, # 🔮 AI Prediction Toggle State
+                "last_predicted_issue": None       # 🔮 Tracking issue
             }
 
             await message.answer("𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦", reply_markup=get_logged_in_keyboard())
@@ -289,6 +284,79 @@ async def process_password(message: types.Message, state: FSMContext):
         if 'p' in locals(): await p.stop()
         await state.clear()
         await loading_msg.delete()
+
+# ==========================================================
+# 🔮 AI Prediction Mode Handlers (No Betting)
+# ==========================================================
+@dp.message(F.text == "🔮 AI Prediction")
+async def btn_ai_prediction_toggle(message: types.Message):
+    user_tg_id = message.from_user.id
+    if user_tg_id not in active_sessions:
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+        
+    is_enabled = active_sessions[user_tg_id].get("is_ai_prediction_enabled", False)
+    
+    await message.answer(
+        f"🔮 <b>AI Prediction Broadcast</b>\n\n"
+        "AI ၏ ခန့်မှန်းချက်များကိုသာ ကြည့်ရှုလိုပါက ဤစနစ်ကို ဖွင့်နိုင်ပါသည်။\n"
+        "<b>(မှတ်ချက်: ဤစနစ်သည် လောင်းကြေးကို လုံးဝ ထည့်မည်မဟုတ်ပါ။ အချက်ပေးရုံသာဖြစ်ပါသည်။)</b>",
+        reply_markup=get_ai_prediction_toggle_keyboard(is_enabled)
+    )
+
+@dp.callback_query(F.data == "toggle_aipred")
+async def process_toggle_aipred(callback: types.CallbackQuery):
+    user_tg_id = callback.from_user.id
+    if user_tg_id not in active_sessions:
+        return await callback.answer("⚠️ Session Expired.", show_alert=True)
+        
+    current_state = active_sessions[user_tg_id].get("is_ai_prediction_enabled", False)
+    new_state = not current_state
+    
+    active_sessions[user_tg_id]["is_ai_prediction_enabled"] = new_state
+    
+    await callback.message.edit_reply_markup(
+        reply_markup=get_ai_prediction_toggle_keyboard(new_state)
+    )
+    
+    if new_state:
+        await callback.answer("✅ AI Prediction ပြသခြင်းကို ဖွင့်လိုက်ပါပြီ။", show_alert=True)
+        # စနစ်ဖွင့်လိုက်ပါက Prediction Loop ကို စတင်မည်
+        asyncio.create_task(prediction_broadcast_loop(user_tg_id, callback.message))
+    else:
+        await callback.answer("❌ AI Prediction ပြသခြင်းကို ပိတ်လိုက်ပါပြီ။", show_alert=True)
+
+# 🔮 Broadcast Loop (Only prints prediction, NO PLACE BET)
+async def prediction_broadcast_loop(user_tg_id, message: types.Message):
+    api_error_count = 0
+    while active_sessions.get(user_tg_id, {}).get("is_ai_prediction_enabled", False):
+        try:
+            predicted_bet, confidence, current_issue, ai_name = await get_ai_prediction(user_tg_id)
+            last_issue = active_sessions[user_tg_id].get("last_predicted_issue")
+
+            if current_issue:
+                api_error_count = 0
+                if current_issue != last_issue:
+                    active_sessions[user_tg_id]["last_predicted_issue"] = current_issue
+                    
+                    await message.answer(
+                        f"🔮 <b>AI Prediction (Live)</b>\n"
+                        f"━━━━━━━━━━━━━━━\n"
+                        f"• WINGO_30S : <code>{current_issue}</code>\n"
+                        f"• Model : {ai_name}\n"
+                        f"• Prediction : <b>{predicted_bet.upper()}</b>\n"
+                        f"• Confidence : {confidence:.1f}%\n\n"
+                        f"<i>(⚠️ မှတ်ချက်: ဤစနစ်သည် ခန့်မှန်းချက်ကိုသာ ပြသပြီး လောင်းကြေးထည့်မည် မဟုတ်ပါ။)</i>"
+                    )
+                    await asyncio.sleep(20)  # Next game usually takes 30s, wait 20s to avoid spam
+                else:
+                    await asyncio.sleep(2)
+            else:
+                api_error_count += 1
+                if api_error_count == 3:
+                    await message.answer("⚠️ <b>API အမှားအယွင်း:</b> ပွဲစဉ်အချက်အလက်များကို ယူ၍မရပါ။")
+                await asyncio.sleep(5)
+        except Exception as e:
+            await asyncio.sleep(5)
 
 # ==========================================================
 # 🎯 Hit Betting Handlers
@@ -317,7 +385,6 @@ async def process_hit_bet(callback: types.CallbackQuery):
         active_sessions[user_tg_id]["hit_wait"] = wait_count
         active_sessions[user_tg_id]["current_misses"] = 0 
         
-    # Keyboard UI ကို ချက်ချင်း Update လုပ်ပေးမည်
     await callback.message.edit_reply_markup(
         reply_markup=get_hit_betting_inline_keyboard(wait_count)
     )
@@ -671,7 +738,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                                 profit = current_amount * 0.96
                                 status_title = f"✅ <b>WIN +{profit:.2f} Ks</b>"
                                 active_sessions[user_tg_id]["current_bet_step"] = 0 
-                                active_sessions[user_tg_id]["current_misses"] = 0 # နိုင်သွားရင် အစကနေ ပြန်စောင့်ရန် Reset လုပ်ခြင်း
+                                active_sessions[user_tg_id]["current_misses"] = 0 
                                 
                             elif actual_size == "?":
                                 status_title = f"⚖️ <b>DRAW (Pending)</b>"
@@ -900,6 +967,7 @@ async def logout(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
     if user_tg_id in active_sessions:
         active_sessions[user_tg_id]["is_auto_betting"] = False 
+        active_sessions[user_tg_id]["is_ai_prediction_enabled"] = False 
         try:
             await active_sessions[user_tg_id]["browser"].close()
             await active_sessions[user_tg_id]["playwright"].stop()
