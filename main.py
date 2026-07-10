@@ -759,6 +759,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
 
                     # 👈 Error ကြောင့် စာနှစ်ခါ မထွက်စေရန် ဤနေရာတွင် ကြိုမှတ်ပါမည်
                     last_betted_issue = current_issue
+                    await asyncio.sleep(7)
 
                     success = await place_auto_bet(page, message, predicted_bet, current_amount, silent=True)
                     
