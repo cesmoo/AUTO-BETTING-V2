@@ -388,7 +388,7 @@ async def get_ai_prediction(user_tg_id):
         return None, 0, None, None
 
 # ==========================================================
-# 🔄 Continuous Auto Bet Loop Task
+# 🔄 Continuous Auto Bet Loop Task (Win/Lose Fixed)
 # ==========================================================
 async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
     await message.answer(f"🚀 Auto-Betting စတင်ပါပြီ! (Amount: {amount} Ks)\nရပ်တန့်ရန် /stopauto ကို နှိပ်ပါ။")
@@ -404,13 +404,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
                 if current_issue != last_betted_issue:
                     page = active_sessions[user_tg_id]["page"]
                     
-                    balance_before_str = "0"
-                    try:
-                        bal_el = page.locator('.Wallet__C-balance-l1 div').first
-                        if await bal_el.is_visible(timeout=2000):
-                            balance_before_str = await bal_el.inner_text()
-                    except: pass
-
+                    # လောင်းကြေးမထည့်မီ စာပို့မည်
                     betting_msg = (
                         f"• WINGO_30S : {current_issue}\n"
                         f"• Model : {ai_name}\n"
@@ -423,8 +417,14 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
                     
                     if success:
                         last_betted_issue = current_issue
-                        await asyncio.sleep(25) 
+                        
+                        # 🛑 Balance Update ဖြစ်ရန်နှင့် ရလဒ်ထွက်ရန် အချိန်ပိုစောင့်ပါမည် (၂၈ စက္ကန့်)
+                        await asyncio.sleep(28) 
 
+                        # တကယ့် ဂိမ်းရလဒ် အတိအကျကို API မှ အရင်ပြန်ယူပါမည်
+                        actual_result = await get_latest_game_result(current_issue)
+
+                        # ထို့နောက်မှသာ Balance အသစ်ကို ယူပါမည်
                         balance_after_str = "0"
                         try:
                             bal_el = page.locator('.Wallet__C-balance-l1 div').first
@@ -432,20 +432,21 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
                                 balance_after_str = await bal_el.inner_text()
                         except: pass
 
-                        actual_result = await get_latest_game_result(current_issue)
-
+                        # 🛑 အနိုင်/အရှုံးကို Balance ဖြင့်မစစ်တော့ဘဲ API Result ဖြင့် တိုက်ရိုက်စစ်ဆေးခြင်း
                         try:
-                            b_before = float(balance_before_str.replace('K', '').replace(',', '').strip())
-                            b_after = float(balance_after_str.replace('K', '').replace(',', '').strip())
+                            # actual_result ဥပမာ - "5 | BIG" မှ "big" ကို ဖြတ်ယူခြင်း
+                            actual_size = actual_result.split(" | ")[1].strip().lower() 
+                            predicted_size = predicted_bet.lower()
                             
-                            if b_after > b_before:
-                                profit = b_after - b_before
+                            if predicted_size == actual_size:
+                                # မှန်ကန်ပါက (အမြတ် ၉၆%)
+                                profit = amount * 0.96
                                 status_title = f"✅ <b>WIN +{profit:.2f} Ks</b>"
-                            elif b_after < b_before:
-                                loss = b_before - b_after
-                                status_title = f"❌ <b>LOSE -{loss:.2f} Ks</b>"
+                            elif actual_size == "?":
+                                status_title = f"⚖️ <b>DRAW (Pending)</b>"
                             else:
-                                status_title = f"⚖️ <b>DRAW 0.00 Ks</b>"
+                                # မှားယွင်းပါက
+                                status_title = f"❌ <b>LOSE -{amount:.2f} Ks</b>"
                                 
                             result_msg = (
                                 f"{status_title}\n"
@@ -455,6 +456,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
                                 f"• Balance : {balance_after_str}"
                             )
                             await message.answer(result_msg)
+                            
                             # DB တွင် Balance အသစ် Update လုပ်ရန်
                             await db.update_user_balance(user_tg_id, balance_after_str.strip())
                             
