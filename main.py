@@ -3,6 +3,7 @@ import os
 import html
 from datetime import datetime
 from dotenv import load_dotenv
+
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -11,6 +12,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from aiogram.types import FSInputFile, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
+
 from playwright.async_api import async_playwright
 
 load_dotenv()
@@ -18,6 +20,9 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
+
+# User များ၏ Browser Session များကို ခေတ္တသိမ်းဆည်းထားရန် (Auto Bet အတွက်)
+active_sessions = {}
 
 # ==========================================================
 # 🗂️ FSM States
@@ -89,140 +94,228 @@ async def process_password(message: types.Message, state: FSMContext):
     password = message.text
     data = await state.get_data()
     username = data.get('phone')
+    user_tg_id = message.from_user.id
     
     loading_msg = await message.answer("🔄 <b>အကောင့်ဝင်နေပါသည်... ခဏစောင့်ပါ...</b>")
     
-    async with async_playwright() as p:
-        # Docker တွင် အဆင်ပြေစေရန် args များ ထည့်သွင်းထားပါသည်
-        browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36", 
-            viewport={'width': 390, 'height': 844}, 
-            is_mobile=True
-        )
-        page = await context.new_page()
-        
-        try:
-            # ၁။ Login စာမျက်နှာသို့ သွားခြင်း
-            await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
-            await page.wait_for_timeout(3000)
+    # Playwright ကို စတင်ခြင်း
+    p = await async_playwright().start()
+    browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
+    context = await browser.new_context(
+        user_agent="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36", 
+        viewport={'width': 390, 'height': 844}, 
+        is_mobile=True
+    )
+    page = await context.new_page()
+    
+    try:
+        # ၁။ Login စာမျက်နှာသို့ သွားခြင်း
+        await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
+        await page.wait_for_timeout(3000)
 
-            # ၂။ Vue.js Reactivity ကို ကျော်ဖြတ်၍ အချက်အလက်များ ထည့်သွင်းခြင်း
-            js_code = """
-            ([user, pwd]) => {
-                function fillVueInput(element, value) {
-                    if (!element) return false;
-                    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-                    nativeSetter.call(element, value);
-                    element.dispatchEvent(new Event('input', { bubbles: true }));
-                    element.dispatchEvent(new Event('change', { bubbles: true }));
-                    element.blur();
-                    return true;
-                }
-                
-                let phone = document.querySelector('input[name="userNumber"]');
-                fillVueInput(phone, user);
-                
-                let pass = document.querySelector('input[placeholder="စကားဝှက်"]') || 
-                           document.querySelector('input[placeholder="Password"]') || 
-                           document.querySelector('.passwordInput__container-input input');
-                fillVueInput(pass, pwd);
+        # ၂။ Vue.js Reactivity ကို ကျော်ဖြတ်၍ အချက်အလက်များ ထည့်သွင်းခြင်း
+        js_code = """
+        ([user, pwd]) => {
+            function fillVueInput(element, value) {
+                if (!element) return false;
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nativeSetter.call(element, value);
+                element.dispatchEvent(new Event('input', { bubbles: true }));
+                element.dispatchEvent(new Event('change', { bubbles: true }));
+                element.blur();
+                return true;
             }
-            """
-            await page.evaluate(js_code, [username, password])
-            await page.wait_for_timeout(1000)
+            
+            let phone = document.querySelector('input[name="userNumber"]');
+            fillVueInput(phone, user);
+            
+            let pass = document.querySelector('input[placeholder="စကားဝှက်"]') || 
+                       document.querySelector('input[placeholder="Password"]') || 
+                       document.querySelector('.passwordInput__container-input input');
+            fillVueInput(pass, pwd);
+        }
+        """
+        await page.evaluate(js_code, [username, password])
+        await page.wait_for_timeout(1000)
 
-            # ၃။ Login ခလုတ်ကို နှိပ်ခြင်း
-            await page.evaluate("""
-                () => {
-                    let btn = document.querySelector('button.active');
-                    if (btn) btn.click();
-                }
-            """)
+        # ၃။ Login ခလုတ်ကို နှိပ်ခြင်း
+        await page.evaluate("""
+            () => {
+                let btn = document.querySelector('button.active');
+                if (btn) btn.click();
+            }
+        """)
+        
+        await page.wait_for_timeout(5000)
+        
+        # Popup ပိတ်ခြင်း (လိုအပ်ပါက)
+        try:
+            close_selector = ".announcement-dialog__button"
+            for _ in range(3):
+                btn = await page.query_selector(close_selector)
+                if btn:
+                    await btn.click()
+                    await page.wait_for_timeout(1000)
+                else:
+                    break
+        except:
+            pass
+        
+        # ၄။ Login အောင်မြင်မှု စစ်ဆေးခြင်း
+        if "login" not in page.url.lower():
             
-            await page.wait_for_timeout(5000)
-            
-            # Popup ပိတ်ခြင်း (လိုအပ်ပါက)
+            # Info စာမျက်နှာ (#/main) သို့ သွား၍ Data ဆွဲထုတ်ခြင်း
             try:
-                close_selector = ".announcement-dialog__button"
-                for _ in range(3):
-                    btn = await page.query_selector(close_selector)
-                    if btn:
-                        await btn.click()
-                        await page.wait_for_timeout(1000)
-                    else:
-                        break
-            except:
-                pass
-            
-            # ၄။ Login အောင်မြင်မှု စစ်ဆေးခြင်း
-            if "login" not in page.url.lower():
+                await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
+                await page.wait_for_timeout(3000)
+            except Exception as e:
+                print(f"Info Page သို့ သွားရာတွင် Error: {e}")
+
+            user_id, nickname, balance_text = "N/A", "Unknown", "0.00 Ks"
+            site_login_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            try:
+                nick_el = page.locator('.userInfo__container-content-nickname h3').first
+                if await nick_el.is_visible(timeout=3000):
+                    nickname = await nick_el.inner_text()
                 
-                # Info စာမျက်နှာ (#/main) သို့ တိုက်ရိုက်သွားရန်
-                try:
-                    await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
-                    await page.wait_for_timeout(3000)
-                except Exception as e:
-                    print(f"Info Page သို့ သွားရာတွင် Error: {e}")
-
-                # ၅။ DOM ထဲမှ Data များကို အတိအကျ ဆွဲထုတ်ခြင်း
-                user_id = "N/A"
-                nickname = "Unknown"
-                balance_text = "0.00 Ks"
-                site_login_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-                try:
-                    nick_el = page.locator('.userInfo__container-content-nickname h3').first
-                    if await nick_el.is_visible(timeout=3000):
-                        nickname = await nick_el.inner_text()
+                uid_el = page.locator('.userInfo__container-content-uid span:nth-child(3)').first
+                if await uid_el.is_visible(timeout=2000):
+                    user_id = await uid_el.inner_text()
                     
-                    uid_el = page.locator('.userInfo__container-content-uid span:nth-child(3)').first
-                    if await uid_el.is_visible(timeout=2000):
-                        user_id = await uid_el.inner_text()
-                        
-                    balance_el = page.locator('.balance_info p.totalSavings__container-header__subtitle span').first
-                    if await balance_el.is_visible(timeout=2000):
-                        balance_text = await balance_el.inner_text()
-                        
-                    time_el = page.locator('.userInfo__container-content-logintime span:nth-child(2)').first
-                    if await time_el.is_visible(timeout=2000):
-                        site_login_time = await time_el.inner_text()
+                balance_el = page.locator('.balance_info p.totalSavings__container-header__subtitle span').first
+                if await balance_el.is_visible(timeout=2000):
+                    balance_text = await balance_el.inner_text()
 
-                except Exception as e:
-                    print(f"Scraping Error: {e}")
+            except Exception as e:
+                print(f"Scraping Error: {e}")
 
-                # ၆။ State ထဲမှာ Data တွေကို သိမ်းဆည်းခြင်း
-                await state.update_data(
-                    is_logged_in=True,
-                    username=username,
-                    user_id=user_id.strip(),
-                    nickname=nickname.strip(),
-                    balance=balance_text.strip(),
-                    login_time=site_login_time.strip()
-                )
+            # ၅။ Win Go 30s စာမျက်နှာသို့ သွားထားခြင်း (Auto Bet အတွက် အဆင်သင့်ဖြစ်စေရန်)
+            await page.goto("https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1", wait_until="networkidle")
+            await page.wait_for_timeout(2000)
 
-                await message.answer(
-                    "✅ <b>LOGIN SUCCESSFUL</b>\n\n"
-                    "သင့်အကောင့်အချက်အလက်များကို ကြည့်ရှုရန် အောက်ပါ <b>📋 Info</b> ခလုတ်ကို နှိပ်ပါ။",
-                    reply_markup=get_logged_in_keyboard()
-                )
-                await state.set_state(LoginForm.main_menu)
-                
-            else:
-                await message.answer("❌ <b>Login မအောင်မြင်ပါ။ စကားဝှက် မှားယွင်းနေနိုင်ပါသည်။</b>", reply_markup=get_main_keyboard())
-                await state.clear()
+            # ၆။ State ထဲမှာ Data တွေကို သိမ်းဆည်းခြင်း
+            await state.update_data(
+                is_logged_in=True, username=username, user_id=user_id.strip(),
+                nickname=nickname.strip(), balance=balance_text.strip(), login_time=site_login_time.strip()
+            )
 
-            await loading_msg.delete()
+            # Session သိမ်းဆည်းခြင်း (Bot မပိတ်မချင်း Browser ပွင့်နေမည်)
+            active_sessions[user_tg_id] = {
+                "playwright": p,
+                "browser": browser,
+                "page": page
+            }
 
-        except Exception as e:
-            await message.answer(f"⚠️ <b>Error:</b> {html.escape(str(e))}", reply_markup=get_main_keyboard())
-            await state.clear()
-            await loading_msg.delete()
-        finally:
+            await message.answer(
+                "✅ <b>LOGIN SUCCESSFUL</b>\n\n"
+                "သင့်အကောင့်အချက်အလက်များကို ကြည့်ရှုရန် အောက်ပါ <b>📋 Info</b> ခလုတ်ကို နှိပ်ပါ။\n"
+                "လောင်းကြေးထည့်ရန် <code>/bet [big/small/red/green/violet] [amount]</code> ကို အသုံးပြုပါ။",
+                reply_markup=get_logged_in_keyboard()
+            )
+            await state.set_state(LoginForm.main_menu)
+            
+        else:
+            await message.answer("❌ <b>Login မအောင်မြင်ပါ။ စကားဝှက် မှားယွင်းနေနိုင်ပါသည်။</b>", reply_markup=get_main_keyboard())
             await browser.close()
+            await p.stop()
+            await state.clear()
+
+        await loading_msg.delete()
+
+    except Exception as e:
+        await message.answer(f"⚠️ <b>Error:</b> {html.escape(str(e))}", reply_markup=get_main_keyboard())
+        await browser.close()
+        await p.stop()
+        await state.clear()
+        await loading_msg.delete()
+
 
 # ==========================================================
-# 📋 Info Button (State ထဲက Data ပြသရန်)
+# 🚀 Auto Bet Function (with Debugging)
+# ==========================================================
+async def place_auto_bet(page, message: types.Message, bet_type: str, amount: int = 10):
+    try:
+        await message.answer(f"🔄 Auto Bet စတင်နေပါသည်... ရွေးချယ်မှု: {bet_type.capitalize()}, ပမာဏ: {amount}")
+
+        bet_choice = bet_type.lower()
+        
+        # ၁။ အရောင် သို့မဟုတ် အကြီး/အသေး ရွေးချယ်ခြင်း
+        if bet_choice == "big":
+            await page.locator('.Betting__C-foot-b').click(timeout=5000) 
+        elif bet_choice == "small":
+            await page.locator('.Betting__C-foot-s').click(timeout=5000)
+        elif bet_choice == "red":
+            await page.locator('.Betting__C-head-r').click(timeout=5000)
+        elif bet_choice == "green":
+            await page.locator('.Betting__C-head-g').click(timeout=5000)
+        elif bet_choice in ["violet", "purple"]:
+            await page.locator('.Betting__C-head-p').click(timeout=5000)
+        else:
+            await message.answer("❌ မှားယွင်းနေပါသည်။ 'big', 'small', 'red', 'green', 'violet' ထဲမှ တစ်ခုရွေးပါ။")
+            return False
+
+        await page.wait_for_timeout(1000)
+
+        # ၂။ လောင်းကြေးပမာဏ ရွေးချယ်ခြင်း (10, 100, 1000, 10000)
+        amount_locator = page.locator(f"div.Betting__Popup-body-line-item", has_text=str(amount)).first
+        await amount_locator.click(timeout=3000)
+        await page.wait_for_timeout(500)
+
+        # ၃။ အတည်ပြု (Confirm) ခလုတ်ကို နှိပ်ခြင်း
+        confirm_btn = page.locator('.Betting__Popup-foot > div').last
+        await confirm_btn.click(timeout=3000)
+
+        await page.wait_for_timeout(2000)
+        await message.answer("✅ <b>လောင်းကြေး အောင်မြင်စွာ ထည့်သွင်းပြီးပါပြီ။</b>")
+        return True
+
+    except Exception as e:
+        # 🐛 DEBUGGING: Error တက်ပါက Screenshot ရိုက်ခြင်း
+        error_image_path = f"debug_error_{message.from_user.id}.png"
+        try:
+            await page.screenshot(path=error_image_path, full_page=True)
+            photo = FSInputFile(error_image_path)
+            error_text = str(e).split('\n')[0][:200] 
+            caption_text = (
+                "❌ <b>Auto Bet လုပ်ဆောင်မှု ရပ်တန့်သွားပါသည်!</b>\n\n"
+                f"<code>{error_text}</code>"
+            )
+            await message.answer_photo(photo=photo, caption=caption_text)
+            if os.path.exists(error_image_path):
+                os.remove(error_image_path)
+        except Exception as screenshot_err:
+            await message.answer(f"❌ Error ဖြစ်သွားသော်လည်း Screenshot ရိုက်ယူ၍ မရပါ။\n{screenshot_err}")
+
+        return False
+
+# ==========================================================
+# 🕹️ Bet Command Handler
+# ==========================================================
+@dp.message(Command("bet"))
+async def cmd_bet(message: types.Message, state: FSMContext):
+    user_tg_id = message.from_user.id
+    
+    # Session ရှိ/မရှိ စစ်ဆေးခြင်း
+    if user_tg_id not in active_sessions:
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+        
+    args = message.text.split()
+    if len(args) < 2:
+        return await message.answer("⚠️ <b>အသုံးပြုနည်း:</b> /bet [big/small/red/green/violet] [amount]\nဥပမာ: <code>/bet big 100</code>")
+
+    bet_type = args[1]
+    amount = 10
+    if len(args) >= 3 and args[2].isdigit():
+        amount = int(args[2])
+        
+    # Active Session မှ Page ကို ယူ၍ Auto Bet ထိုးခြင်း
+    page = active_sessions[user_tg_id]["page"]
+    await place_auto_bet(page, message, bet_type, amount)
+
+
+# ==========================================================
+# 📋 Info Button
 # ==========================================================
 @dp.message(LoginForm.main_menu, F.text == "📋 Info")
 async def show_info(message: types.Message, state: FSMContext):
@@ -243,11 +336,8 @@ async def show_info(message: types.Message, state: FSMContext):
         "├─ 📅 <b>Login Date:</b> {login_time}\n"
         "└─ ✅ <b>Allow Withdraw:</b> Yes\n"
     ).format(
-        user_id=user_id, 
-        username=username, 
-        nickname=nickname, 
-        balance=balance, 
-        login_time=login_time
+        user_id=user_id, username=username, nickname=nickname, 
+        balance=balance, login_time=login_time
     )
     
     await message.answer(info_text, reply_markup=get_logged_in_keyboard())
@@ -257,6 +347,17 @@ async def show_info(message: types.Message, state: FSMContext):
 # ==========================================================
 @dp.message(LoginForm.main_menu, F.text == "🔐 Logout")
 async def logout(message: types.Message, state: FSMContext):
+    user_tg_id = message.from_user.id
+    
+    # Logout လုပ်ချိန်တွင် Browser Session ကို ပိတ်ခြင်း
+    if user_tg_id in active_sessions:
+        try:
+            await active_sessions[user_tg_id]["browser"].close()
+            await active_sessions[user_tg_id]["playwright"].stop()
+        except:
+            pass
+        del active_sessions[user_tg_id]
+        
     await state.clear()
     await message.answer("👋 အကောင့်ထွက်ပြီးပါပြီ။", reply_markup=get_main_keyboard())
 
@@ -265,7 +366,7 @@ async def logout(message: types.Message, state: FSMContext):
 # ==========================================================
 @dp.message(F.text == "🎰 Games")
 async def games(message: types.Message):
-    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>\n(ဤအပိုင်းကို နောက်ပိုင်းတွင် ထပ်မံဖြည့်စွက်နိုင်ပါသည်)", reply_markup=get_main_keyboard())
+    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>\nWin Go 30s ကို ရွေးချယ်ထားပါသည်။ Auto Bet အတွက် <code>/bet</code> command ကို သုံးပါ။", reply_markup=get_main_keyboard())
 
 # ==========================================================
 # 🚀 Main Bot Loop
