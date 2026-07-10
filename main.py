@@ -107,27 +107,27 @@ VALID_AI_NAMES = [m["name"] for m in ai_engines.AI_MODES.values()]
 @dp.message(Command("start"))
 async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("👋 <b>မင်္ဂလာပါ!</b>\nအကောင့်ဝင်ရန် Login ကိုနှိပ်ပါ။", reply_markup=get_main_keyboard())
+    await message.answer("ᴄʟɪᴄᴋ ᴛᴏ ʟᴏɢɪɴ", reply_markup=get_main_keyboard())
 
 @dp.message(F.text == "🔐 Login")
 async def login_start(message: types.Message, state: FSMContext):
     await state.set_state(LoginForm.select_site)
-    await message.answer("🌐 <b>Please select a site to login:</b>", reply_markup=get_site_keyboard())
+    await message.answer("ᴘʟᴇᴀꜱᴇ ꜱᴇʟᴇᴄᴛ ᴀ ꜱɪᴛᴇ ᴛᴏ ʟᴏɢɪɴ", reply_markup=get_site_keyboard())
 
 @dp.message(LoginForm.select_site)
 async def process_site(message: types.Message, state: FSMContext):
-    if message.text == "🔙 နောက်သို့":
+    if message.text == "ʙᴀᴄᴋ":
         await state.clear()
         return await message.answer("Cancelled.", reply_markup=get_main_keyboard())
     await state.update_data(site=message.text)
     await state.set_state(LoginForm.enter_phone)
-    await message.answer("📞 <b>Please enter your phone:</b>", reply_markup=ReplyKeyboardRemove())
+    await message.answer("ᴘʟᴇᴀꜱᴇ ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘʜᴏɴᴇ ɴᴜᴍʙᴇʀ", reply_markup=ReplyKeyboardRemove())
 
 @dp.message(LoginForm.enter_phone)
 async def process_phone(message: types.Message, state: FSMContext):
     await state.update_data(phone=message.text)
     await state.set_state(LoginForm.enter_password)
-    await message.answer("🔑 <b>Please enter your password:</b>", reply_markup=ReplyKeyboardRemove())
+    await message.answer("ᴘʟᴇᴀꜱᴇ ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘᴀꜱꜱᴡᴏʀᴅ", reply_markup=ReplyKeyboardRemove())
 
 # ==========================================================
 # 🔥 Playwright Logic: Login & Database Save
@@ -139,7 +139,7 @@ async def process_password(message: types.Message, state: FSMContext):
     username = data.get('phone')
     user_tg_id = message.from_user.id
     
-    loading_msg = await message.answer("🔄 <b>အကောင့်ဝင်နေပါသည်... ခဏစောင့်ပါ...</b>")
+    loading_msg = await message.answer("ꜱɪɢɴɪɴɢ ɪɴ... ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ.")
     
     p = await async_playwright().start()
     browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
@@ -236,11 +236,11 @@ async def process_password(message: types.Message, state: FSMContext):
                 "start_balance": 0.0            
             }
 
-            await message.answer("✅ <b>LOGIN SUCCESSFUL</b>\nသင့်အကောင့်အချက်အလက်များကို Database တွင် မှတ်တမ်းတင်ထားပါသည်။", reply_markup=get_logged_in_keyboard())
+            await message.answer("𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦", reply_markup=get_logged_in_keyboard())
             await state.set_state(LoginForm.main_menu)
             
         else:
-            await message.answer("❌ <b>Login မအောင်မြင်ပါ။ စကားဝှက် မှားယွင်းနေနိုင်ပါသည်။</b>", reply_markup=get_main_keyboard())
+            await message.answer("ʟᴏɢɪɴ ꜰᴀɪʟᴇᴅ ᴘᴀꜱꜱᴡᴏʀᴅ ɪɴᴄᴏʀʀᴇᴄᴛ", reply_markup=get_main_keyboard())
             await browser.close()
             await p.stop()
             await state.clear()
