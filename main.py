@@ -37,7 +37,7 @@ class LoginForm(StatesGroup):
     enter_phone = State()
     enter_password = State()
     main_menu = State()
-    enter_bet_sequence = State() # 👈 Bet Size သတ်မှတ်ရန် State အသစ်
+    enter_bet_sequence = State() # 👈 Bet Size သတ်မှတ်ရန် State
 
 # ==========================================================
 # ⌨️ Keyboards
@@ -287,8 +287,44 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
 
         await page.wait_for_timeout(1000)
 
-        amount_locator = page.locator(f"div.Betting__Popup-body-line-item", has_text=str(amount)).first
-        await amount_locator.click(timeout=3000, force=True)
+        # ==========================================
+        # 1. Base Amount (အခြေခံကြေး) နှင့် Multiplier (အဆ) ကို တွက်ချက်ခြင်း
+        # ==========================================
+        if amount >= 1000:
+            base_text = "1000"
+            multiplier = amount // 1000
+        elif amount >= 100:
+            base_text = "100"
+            multiplier = amount // 100
+        else:
+            base_text = "10"
+            multiplier = amount // 10
+
+        # 2. Base Amount (10, 100, 1000) ခလုတ်ကို အရင်ရှာပြီး အတိအကျ နှိပ်မည်
+        try:
+            base_locator = page.locator("div.Betting__Popup-body-line-item").get_by_text(base_text, exact=True).first
+            await base_locator.click(timeout=2000, force=True)
+            await page.wait_for_timeout(500)
+        except:
+            pass # မတွေ့ခဲ့ရင် Default အတိုင်း ဆက်သွားမည်
+
+        # 3. Multiplier (အဆ) ကို Input Field ထဲသို့ Javascript ဖြင့် တိုက်ရိုက်ရိုက်ထည့်မည်
+        js_set_multiplier = f"""
+        () => {{
+            let input = document.querySelector('.Betting__Popup-body input') || 
+                        document.querySelector('input[type="number"]') || 
+                        document.querySelector('input.van-stepper__input');
+            if(input) {{
+                const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                nativeSetter.call(input, '{multiplier}');
+                input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+            }}
+        }}
+        """
+        await page.evaluate(js_set_multiplier)
+        # ==========================================
+
         await page.wait_for_timeout(500)
 
         confirm_btn = page.locator('.Betting__Popup-foot > div').last
