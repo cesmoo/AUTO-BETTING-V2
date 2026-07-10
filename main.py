@@ -37,6 +37,7 @@ class LoginForm(StatesGroup):
     enter_phone = State()
     enter_password = State()
     main_menu = State()
+    enter_bet_sequence = State() # 👈 Bet Size သတ်မှတ်ရန် State အသစ်
 
 # ==========================================================
 # ⌨️ Keyboards
@@ -56,8 +57,9 @@ def get_site_keyboard():
 def get_logged_in_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📋 Info"), KeyboardButton(text="💰 Balance")], 
-            [KeyboardButton(text="🎰 Games"), KeyboardButton(text="🤖 AI Mode")],
+            [KeyboardButton(text="📋 Info"), KeyboardButton(text="💰 Balance"), KeyboardButton(text="📊 Status")], 
+            [KeyboardButton(text="▶️ Start Auto-Bet"), KeyboardButton(text="🛑 Stop Auto-Bet")],
+            [KeyboardButton(text="🎰 Games"), KeyboardButton(text="🤖 AI Mode"), KeyboardButton(text="⚙️ Set Bet-Size")],
             [KeyboardButton(text="🔐 Logout")]
         ],
         resize_keyboard=True
@@ -181,11 +183,9 @@ async def process_password(message: types.Message, state: FSMContext):
             await page.goto("https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1", wait_until="networkidle")
             await page.wait_for_timeout(2000)
 
-            # 🛑 DB မှ User ၏ ယခင် AI Mode ကို ဆွဲထုတ်ခြင်း သို့မဟုတ် အသစ်ဖန်တီးခြင်း
             db_user = await db.get_user(user_tg_id)
             ai_mode = db_user.get("ai_mode", "🧠 Basic Trend AI") if db_user else "🧠 Basic Trend AI"
 
-            # DB သို့ Data သိမ်းဆည်းခြင်း
             await db.save_user_login(user_tg_id, username, user_id.strip(), nickname.strip(), balance_text.strip(), site_login_time, ai_mode)
 
             await state.update_data(
@@ -198,7 +198,9 @@ async def process_password(message: types.Message, state: FSMContext):
                 "browser": browser,
                 "page": page,
                 "is_auto_betting": False,
-                "ai_mode": ai_mode
+                "ai_mode": ai_mode,
+                "bet_sequence": [10],           # Default Sequence 10 Ks
+                "current_bet_step": 0           # Default Step 0
             }
 
             await message.answer("✅ <b>LOGIN SUCCESSFUL</b>\nသင့်အကောင့်အချက်အလက်များကို Database တွင် မှတ်တမ်းတင်ထားပါသည်။", reply_markup=get_logged_in_keyboard())
@@ -245,7 +247,6 @@ async def set_ai_mode(message: types.Message):
     selected_mode = message.text
     active_sessions[user_tg_id]["ai_mode"] = selected_mode
     
-    # 🛑 AI Mode ကို DB သို့ သိမ်းဆည်းမည်
     await db.update_user_ai_mode(user_tg_id, selected_mode)
     
     await message.answer(f"✅ AI စနစ်ကို <b>{selected_mode}</b> သို့ ပြောင်းလဲသတ်မှတ်လိုက်ပါပြီ။", reply_markup=get_logged_in_keyboard())
@@ -388,10 +389,10 @@ async def get_ai_prediction(user_tg_id):
         return None, 0, None, None
 
 # ==========================================================
-# 🔄 Continuous Auto Bet Loop Task (Win/Lose Fixed)
+# 🔄 Continuous Auto Bet Loop Task (Sequence Applied)
 # ==========================================================
-async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
-    await message.answer(f"🚀 Auto-Betting စတင်ပါပြီ! (Amount: {amount} Ks)\nရပ်တန့်ရန် /stopauto ကို နှိပ်ပါ။")
+async def auto_bet_loop(user_tg_id, message: types.Message):
+    await message.answer("🚀 Auto-Betting စတင်ပါပြီ! ရပ်တန့်ရန် 🛑 Stop Auto-Bet ကို နှိပ်ပါ။")
     last_betted_issue = None
     api_error_count = 0 
 
@@ -404,27 +405,34 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
                 if current_issue != last_betted_issue:
                     page = active_sessions[user_tg_id]["page"]
                     
-                    # လောင်းကြေးမထည့်မီ စာပို့မည်
+                    # 🛑 လက်ရှိ ရောက်နေသော Sequence Level (Amount) ကို ဆွဲထုတ်ခြင်း
+                    sequence = active_sessions[user_tg_id].get("bet_sequence", [10])
+                    step = active_sessions[user_tg_id].get("current_bet_step", 0)
+                    
+                    # အဆင့်ကျော်သွားပါက သုညက ပြန်စရန် (ဥပမာ အများဆုံးမှာရှုံးသွားလျှင်)
+                    if step >= len(sequence):
+                        step = 0
+                        active_sessions[user_tg_id]["current_bet_step"] = 0
+                        
+                    current_amount = sequence[step]
+
                     betting_msg = (
                         f"• WINGO_30S : {current_issue}\n"
                         f"• Model : {ai_name}\n"
-                        f"• Pred : {predicted_bet.upper()} | {amount} Ks\n"
+                        f"• Pred : {predicted_bet.upper()} | {current_amount} Ks\n"
+                        f"• Step : {step + 1}/{len(sequence)}\n"
                         f"• Auto-Betting ✅"
                     )
                     await message.answer(betting_msg)
 
-                    success = await place_auto_bet(page, message, predicted_bet, amount, silent=True)
+                    success = await place_auto_bet(page, message, predicted_bet, current_amount, silent=True)
                     
                     if success:
                         last_betted_issue = current_issue
-                        
-                        # 🛑 Balance Update ဖြစ်ရန်နှင့် ရလဒ်ထွက်ရန် အချိန်ပိုစောင့်ပါမည် (၂၈ စက္ကန့်)
                         await asyncio.sleep(28) 
 
-                        # တကယ့် ဂိမ်းရလဒ် အတိအကျကို API မှ အရင်ပြန်ယူပါမည်
                         actual_result = await get_latest_game_result(current_issue)
 
-                        # ထို့နောက်မှသာ Balance အသစ်ကို ယူပါမည်
                         balance_after_str = "0"
                         try:
                             bal_el = page.locator('.Wallet__C-balance-l1 div').first
@@ -432,21 +440,26 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
                                 balance_after_str = await bal_el.inner_text()
                         except: pass
 
-                        # 🛑 အနိုင်/အရှုံးကို Balance ဖြင့်မစစ်တော့ဘဲ API Result ဖြင့် တိုက်ရိုက်စစ်ဆေးခြင်း
                         try:
-                            # actual_result ဥပမာ - "5 | BIG" မှ "big" ကို ဖြတ်ယူခြင်း
                             actual_size = actual_result.split(" | ")[1].strip().lower() 
                             predicted_size = predicted_bet.lower()
                             
                             if predicted_size == actual_size:
-                                # မှန်ကန်ပါက (အမြတ် ၉၆%)
-                                profit = amount * 0.96
+                                profit = current_amount * 0.96
                                 status_title = f"✅ <b>WIN +{profit:.2f} Ks</b>"
+                                
+                                # 🟢 အနိုင်ရပါက Step 0 (အစ) သို့ ပြန်လည်ရောက်ရှိမည်
+                                active_sessions[user_tg_id]["current_bet_step"] = 0 
+                                
                             elif actual_size == "?":
                                 status_title = f"⚖️ <b>DRAW (Pending)</b>"
                             else:
-                                # မှားယွင်းပါက
-                                status_title = f"❌ <b>LOSE -{amount:.2f} Ks</b>"
+                                status_title = f"❌ <b>LOSE -{current_amount:.2f} Ks</b>"
+                                
+                                # 🔴 ရှုံးပါက နောက်ထပ် Step တစ်ခုသို့ တက်မည်
+                                active_sessions[user_tg_id]["current_bet_step"] += 1
+                                if active_sessions[user_tg_id]["current_bet_step"] >= len(sequence):
+                                    active_sessions[user_tg_id]["current_bet_step"] = 0
                                 
                             result_msg = (
                                 f"{status_title}\n"
@@ -456,8 +469,6 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
                                 f"• Balance : {balance_after_str}"
                             )
                             await message.answer(result_msg)
-                            
-                            # DB တွင် Balance အသစ် Update လုပ်ရန်
                             await db.update_user_balance(user_tg_id, balance_after_str.strip())
                             
                         except Exception:
@@ -478,34 +489,120 @@ async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
             await asyncio.sleep(5)
 
 # ==========================================================
-# 🤖 Start / Stop Continuous Auto Bet Commands
+# ⚙️ Set Bet-Size Handlers
 # ==========================================================
-@dp.message(Command("startauto"))
-async def cmd_start_auto(message: types.Message, state: FSMContext):
+@dp.message(F.text == "⚙️ Set Bet-Size")
+async def btn_set_betsize(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
-    if user_tg_id not in active_sessions: return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+    if user_tg_id not in active_sessions: 
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+    
+    current_seq = active_sessions[user_tg_id].get("bet_sequence", [10])
+    seq_str = "-".join(map(str, current_seq))
+    
+    await state.set_state(LoginForm.enter_bet_sequence)
+    await message.answer(
+        f"⚙️ <b>Auto Bet လောင်းကြေး (Bet Size) ကို သတ်မှတ်ပါ။</b>\n\n"
+        f"လက်ရှိ သတ်မှတ်ထားသော ပမာဏ: <code>{seq_str}</code>\n\n"
+        f"<b>Format:</b> 10-20-40-80 (သို့) 100-200-400\n"
+        f"ကျေးဇူးပြု၍ မိမိလိုချင်သော ပမာဏကို (-) ခြား၍ ရိုက်ထည့်ပါ။ မပြောင်းလဲလိုပါက 'Cancel' ဟုရိုက်ပါ။",
+        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Cancel")]], resize_keyboard=True)
+    )
+
+@dp.message(LoginForm.enter_bet_sequence)
+async def process_bet_sequence(message: types.Message, state: FSMContext):
+    user_tg_id = message.from_user.id
+    text = message.text.strip()
+    
+    if text.lower() == 'cancel':
+        await state.set_state(LoginForm.main_menu)
+        return await message.answer("❌ မပြောင်းလဲတော့ပါ။", reply_markup=get_logged_in_keyboard())
+    
+    try:
+        sequence = [int(x.strip()) for x in text.split('-')]
+        if len(sequence) == 0 or any(x <= 0 for x in sequence):
+            raise ValueError
+        
+        active_sessions[user_tg_id]["bet_sequence"] = sequence
+        active_sessions[user_tg_id]["current_bet_step"] = 0 # အစ (၁၀) ကနေ ပြန်စရန်
+        
+        seq_str = "-".join(map(str, sequence))
+        await state.set_state(LoginForm.main_menu)
+        await message.answer(
+            f"✅ <b>Bet Size အောင်မြင်စွာ သတ်မှတ်ပြီးပါပြီ:</b> <code>{seq_str}</code>", 
+            reply_markup=get_logged_in_keyboard()
+        )
+    except ValueError:
+        await message.answer("❌ မှားယွင်းနေပါသည်။ ဥပမာ: 10-20-40-80 ဟုသာ ဂဏန်းများကို တုံးတို (-) ခြား၍ ရိုက်ထည့်ပါ။")
+
+# ==========================================================
+# 🤖 Reply Keyboard Auto Bet & Status Handlers
+# ==========================================================
+@dp.message(F.text == "▶️ Start Auto-Bet")
+async def btn_start_auto(message: types.Message, state: FSMContext):
+    user_tg_id = message.from_user.id
+    if user_tg_id not in active_sessions: 
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
 
     if active_sessions[user_tg_id].get("is_auto_betting", False):
-        return await message.answer("⚠️ ဆက်တိုက် Auto Bet စနစ်မှာ အလုပ်လုပ်နေဆဲ ဖြစ်ပါသည်။ ရပ်လိုပါက /stopauto ကိုနှိပ်ပါ။")
+        return await message.answer("⚠️ Auto Bet အလုပ်လုပ်နေဆဲ ဖြစ်ပါသည်။ ရပ်လိုပါက 🛑 Stop Auto-Bet ကိုနှိပ်ပါ။")
 
-    args = message.text.split()
-    amount = 10
-    if len(args) >= 2 and args[1].isdigit(): amount = int(args[1])
+    if "bet_sequence" not in active_sessions[user_tg_id]:
+        active_sessions[user_tg_id]["bet_sequence"] = [10]
+        active_sessions[user_tg_id]["current_bet_step"] = 0
 
     active_sessions[user_tg_id]["is_auto_betting"] = True
-    asyncio.create_task(auto_bet_loop(user_tg_id, message, amount))
+    asyncio.create_task(auto_bet_loop(user_tg_id, message))
 
-@dp.message(Command("stopauto"))
-async def cmd_stop_auto(message: types.Message, state: FSMContext):
+@dp.message(F.text == "🛑 Stop Auto-Bet")
+async def btn_stop_auto(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
-    if user_tg_id not in active_sessions: return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+    if user_tg_id not in active_sessions: 
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
 
     active_sessions[user_tg_id]["is_auto_betting"] = False
     await message.answer("🛑 <b>ဆက်တိုက် Auto Bet စနစ်ကို ရပ်တန့်လိုက်ပါပြီ။</b>")
 
+@dp.message(F.text == "📊 Status")
+async def btn_status(message: types.Message, state: FSMContext):
+    user_tg_id = message.from_user.id
+    if user_tg_id not in active_sessions: 
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+
+    session = active_sessions[user_tg_id]
+    is_auto = "Running 🟢" if session.get("is_auto_betting", False) else "Stopped 🔴"
+    ai_mode = session.get("ai_mode", "🧠 Basic Trend AI")
+    
+    current_seq = session.get("bet_sequence", [10])
+    seq_str = "-".join(map(str, current_seq))
+    current_step = session.get("current_bet_step", 0)
+    
+    data = await state.get_data()
+    balance = data.get('balance', '0.00 Ks')
+
+    status_text = (
+        "📊 <b>Bot Status</b>\n"
+        "━━━━━━━━━━━━━━━\n"
+        f"🤖 <b>Auto-Bet State:</b> {is_auto}\n"
+        f"🧠 <b>Active AI Mode:</b> {ai_mode}\n"
+        f"💰 <b>Current Balance:</b> {balance}\n"
+        f"⚙️ <b>Bet Sequence:</b> <code>{seq_str}</code>\n"
+        f"📍 <b>Current Step:</b> {current_step + 1}/{len(current_seq)} ({current_seq[current_step]} Ks)\n"
+    )
+    await message.answer(status_text)
+
 # ==========================================================
-# 🎯 Single AI Bet Command (For One-Time Bet)
+# 🤖 Command Handlers (Legacy / Command based)
 # ==========================================================
+@dp.message(Command("startauto"))
+async def cmd_start_auto(message: types.Message, state: FSMContext):
+    # This command maps to the same UI button logic now
+    await btn_start_auto(message, state)
+
+@dp.message(Command("stopauto"))
+async def cmd_stop_auto(message: types.Message, state: FSMContext):
+    await btn_stop_auto(message, state)
+
 @dp.message(Command("aibet"))
 async def cmd_aibet(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
@@ -526,16 +623,12 @@ async def cmd_aibet(message: types.Message, state: FSMContext):
             f"🎯 ရွေးချယ်မှု: <b>{predicted_bet.upper()}</b>\n"
             f"⚡ သေချာမှု (Confidence): <b>{confidence}%</b>\n"
             f"💰 လောင်းကြေး: <b>{amount}</b>\n\n"
-          #  f"🔄 အလိုအလျောက် လောင်းကြေးထည့်နေပါသည်..."
         )
         page = active_sessions[user_tg_id]["page"]
         await place_auto_bet(page, message, predicted_bet, amount)
     else:
         await message.answer("❌ API မှ အချက်အလက်ရယူရာတွင် အခက်အခဲရှိနေပါသည်။")
 
-# ==========================================================
-# 🕹️ Standard Manual Bet Command
-# ==========================================================
 @dp.message(Command("bet"))
 async def cmd_bet(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
@@ -569,7 +662,6 @@ async def check_balance(message: types.Message, state: FSMContext):
         if await balance_el.is_visible(timeout=3000):
             balance_text = await balance_el.inner_text()
 
-        # 🛑 DB ကိုပါ Update လုပ်မည်
         await state.update_data(balance=balance_text.strip())
         await db.update_user_balance(user_tg_id, balance_text.strip())
 
@@ -628,8 +720,8 @@ async def games(message: types.Message):
     await message.answer(
         "🎮 <b>Game ရွေးချယ်ရန်:</b>\nWin Go 30s ကို ရွေးချယ်ထားပါသည်။\n\n"
         "🤖 <b>Bot Commands:</b>\n"
-        "<code>/startauto 10</code> - AI ဖြင့် ဆက်တိုက် Auto Bet စတင်ရန်\n"
-        "<code>/stopauto</code> - Auto Bet ရပ်တန့်ရန်\n"
+        "<code>▶️ Start Auto-Bet</code> - ခလုတ်နှိပ်၍ Auto Bet စတင်နိုင်ပါသည်\n"
+        "<code>🛑 Stop Auto-Bet</code> - ခလုတ်နှိပ်၍ Auto Bet ရပ်တန့်နိုင်ပါသည်\n"
         "<code>/aibet 10</code> - AI ဖြင့် တစ်ပွဲသာ ထိုးရန်",
         reply_markup=get_main_keyboard()
     )
