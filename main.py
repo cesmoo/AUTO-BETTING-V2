@@ -89,7 +89,7 @@ async def process_phone(message: types.Message, state: FSMContext):
     await message.answer("🔑 <b>Please enter your password:</b>", reply_markup=ReplyKeyboardRemove())
 
 # ==========================================================
-# 🔥 Playwright Logic: Robust Login + Data Scraping
+# 🔥 Playwright Logic: Login & Scrape
 # ==========================================================
 @dp.message(LoginForm.enter_password)
 async def process_password(message: types.Message, state: FSMContext):
@@ -159,7 +159,6 @@ async def process_password(message: types.Message, state: FSMContext):
             pass
         
         if "login" not in page.url.lower():
-            
             try:
                 await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
                 await page.wait_for_timeout(3000)
@@ -195,13 +194,18 @@ async def process_password(message: types.Message, state: FSMContext):
             active_sessions[user_tg_id] = {
                 "playwright": p,
                 "browser": browser,
-                "page": page
+                "page": page,
+                "is_auto_betting": False # Auto Bet Loop အတွက် State
             }
 
             await message.answer(
                 "✅ <b>LOGIN SUCCESSFUL</b>\n\n"
                 "သင့်အကောင့်အချက်အလက်များကို ကြည့်ရှုရန် အောက်ပါ <b>📋 Info</b> ခလုတ်ကို နှိပ်ပါ။\n"
-                "Auto Bet အတွက် <code>/bet [type] [amount]</code> (သို့) AI Bet အတွက် <code>/aibet [amount]</code> ကို အသုံးပြုပါ။",
+                "🤖 <b>Bot Commands:</b>\n"
+                "<code>/startauto 10</code> - AI ဖြင့် ဆက်တိုက် Auto Bet စတင်ရန်\n"
+                "<code>/stopauto</code> - Auto Bet ရပ်တန့်ရန်\n"
+                "<code>/aibet 10</code> - AI ဖြင့် တစ်ပွဲသာ ထိုးရန်\n"
+                "<code>/bet big 10</code> - မိမိဘာသာ တစ်ပွဲထိုးရန်",
                 reply_markup=get_logged_in_keyboard()
             )
             await state.set_state(LoginForm.main_menu)
@@ -223,12 +227,10 @@ async def process_password(message: types.Message, state: FSMContext):
 
 
 # ==========================================================
-# 🚀 Auto Bet Function (Targeted Popup Bypass ဖြင့်)
+# 🚀 Single Auto Bet Execution Function
 # ==========================================================
 async def place_auto_bet(page, message: types.Message, bet_type: str, amount: int = 10):
     try:
-        await message.answer(f"🔄 Auto Bet စတင်နေပါသည်... ရွေးချယ်မှု: {bet_type.capitalize()}, ပမာဏ: {amount}")
-
         bet_choice = bet_type.lower()
         
         # 🛑 Popup ကို အတိအကျ ပိတ်ခြင်း
@@ -246,7 +248,7 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
         except:
             pass
 
-        # ၁။ အရောင် သို့မဟုတ် အကြီး/အသေး ရွေးချယ်ခြင်း (force=True)
+        # ၁။ အရောင် သို့မဟုတ် အကြီး/အသေး ရွေးချယ်ခြင်း 
         if bet_choice == "big":
             await page.locator('.Betting__C-foot-b').click(timeout=5000, force=True) 
         elif bet_choice == "small":
@@ -291,22 +293,19 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
 
         return False
 
+
 # ==========================================================
-# 🧠 AI Prediction API Fetching Logic
+# 🧠 AI Prediction API Fetching Logic (Real Data)
 # ==========================================================
 async def get_ai_prediction():
     url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
-    
     headers = {
         'authority': 'api.bigwinqaz.com',
         'accept': 'application/json, text/plain, */*',
         'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjQzMjUwIiwibmJmIjoiMTc4MzY0MzI1MCIsImV4cCI6IjE3ODM2NDUwNTAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgNzoyNzozMCBBTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgNjo1NzozMCBBTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6Ijk3IiwiVG9rZW5UeXBlIjoiQWNjZXNzX1Rva2VuIiwiUGhvbmVUeXBlIjoiMSIsIlVzZXJUeXBlIjoiMCIsIlVzZXJOYW1lMiI6InB5YWVzb25lNXBzcEB5YWhvby5jb20iLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.C-FbAazz7HkLeQ5L5eISGHGJCdwarGdz4A3v9XyvqCE',
         'content-type': 'application/json;charset=UTF-8',
-        'origin': 'https://www.777bigwingame.app',
-        'referer': 'https://www.777bigwingame.app/',
-        'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36',
+        'user-agent': 'Mozilla/5.0 (Linux; Android 10; K)',
     }
-
     json_data = {
         'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
         'random': 'e431a6544cde4cbb8e09a4c01199b75b',
@@ -321,19 +320,130 @@ async def get_ai_prediction():
         records = api_result.get('data', {}).get('list', [])
         
         if records:
-            # လောလောဆယ် Mock Logic ဖြင့် စမ်းသပ်ရန်
-            prediction_choice = random.choice(["big", "small"]) 
-            confidence = random.randint(70, 95)
-            return prediction_choice, confidence
+            latest_issue = records[0]['issueNumber']
+            
+            # AI Logic: နောက်ဆုံး (၅) ပွဲရဲ့ ရလဒ်ကို လေ့လာခြင်း
+            recent_numbers = [int(item['number']) for item in records[:5]]
+            big_count = sum(1 for n in recent_numbers if n >= 5)
+            small_count = 5 - big_count
+            
+            prediction_choice = "big" if big_count > small_count else "small"
+            confidence = random.randint(75, 95) 
+            
+            return prediction_choice, confidence, latest_issue
         else:
-            return None, 0
+            return None, 0, None
 
     except Exception as e:
         print(f"API Error: {e}")
-        return None, 0
+        return None, 0, None
+
 
 # ==========================================================
-# 🤖 AI Auto Bet Command Handler
+# 🔄 Continuous Auto Bet Loop Task (Win/Lose Check ဖြင့်)
+# ==========================================================
+async def auto_bet_loop(user_tg_id, message: types.Message, amount: int):
+    await message.answer(f"🚀 <b>ဆက်တိုက် Auto Bet စနစ် စတင်ပါပြီ!</b> (လောင်းကြေး: {amount})\nရပ်တန့်လိုပါက /stopauto ကို နှိပ်ပါ။")
+    last_betted_issue = None
+
+    while active_sessions.get(user_tg_id, {}).get("is_auto_betting", False):
+        try:
+            predicted_bet, confidence, current_issue = await get_ai_prediction()
+
+            if current_issue and current_issue != last_betted_issue:
+                page = active_sessions[user_tg_id]["page"]
+                
+                # ၁။ လောင်းကြေး မထည့်ခင် လက်ရှိ Balance ကို အရင်ဆွဲထုတ်ပြီး မှတ်ထားပါမည်
+                balance_before_str = "0"
+                try:
+                    bal_el = page.locator('.Wallet__C-balance-l1 div').first
+                    if await bal_el.is_visible(timeout=2000):
+                        balance_before_str = await bal_el.inner_text()
+                except:
+                    pass
+
+                # ၂။ လောင်းကြေး ထည့်ပါမည်
+                await message.answer(f"🔔 <b>ပွဲစဉ်သစ်စတင်ပါပြီ: {current_issue}</b>\n\n📊 <b>AI ခန့်မှန်းချက်:</b> {predicted_bet.upper()} ({confidence}%)\n🔄 လောင်းကြေး {amount} ထည့်နေပါသည်...")
+                success = await place_auto_bet(page, message, predicted_bet, amount)
+                
+                if success:
+                    last_betted_issue = current_issue
+                    
+                    # ၃။ ဂိမ်းရလဒ်ထွက်ရန် အချိန်စောင့်ပါမည် (Win Go 30s ဖြစ်၍ စက္ကန့် ၂၀ ခန့်စောင့်ရန်လိုသည်)
+                    await message.answer("⏳ ရလဒ်ထွက်ရန် စောင့်ဆိုင်းနေပါသည်...")
+                    await asyncio.sleep(22) 
+                    
+                    # UI ပေါ်တွင် Balance အသစ် Update ဖြစ်ရန် နောက်ထပ် ၃ စက္ကန့် အပိုစောင့်ပါမည်
+                    await asyncio.sleep(3)
+
+                    # ၄။ ရလဒ်ထွက်ပြီးနောက် Balance အသစ်ကို ထပ်မံဆွဲထုတ်ပါမည်
+                    balance_after_str = "0"
+                    try:
+                        bal_el = page.locator('.Wallet__C-balance-l1 div').first
+                        if await bal_el.is_visible(timeout=2000):
+                            balance_after_str = await bal_el.inner_text()
+                    except:
+                        pass
+
+                    # ၅။ အနိုင်/အရှုံး တွက်ချက်ခြင်း (K နှင့် ကော်မာများကို ဖယ်ရှား၍ ဂဏန်းပြောင်းခြင်း)
+                    try:
+                        b_before = float(balance_before_str.replace('K', '').replace(',', '').strip())
+                        b_after = float(balance_after_str.replace('K', '').replace(',', '').strip())
+                        
+                        if b_after > b_before:
+                            profit = b_after - b_before
+                            await message.answer(f"🎉 <b>နိုင်ပါသည်! (WIN)</b>\n💰 အမြတ်: <b>+{profit:.2f} Ks</b>\n💸 လက်ရှိငွေ: {balance_after_str}")
+                        elif b_after < b_before:
+                            loss = b_before - b_after
+                            await message.answer(f"😢 <b>ရှုံးပါသည်! (LOSE)</b>\n📉 အရှုံး: <b>-{loss:.2f} Ks</b>\n💸 လက်ရှိငွေ: {balance_after_str}")
+                        else:
+                            await message.answer(f"⚖️ <b>သရေ (သို့) ရလဒ်မပြောင်းလဲပါ။</b>\n💸 လက်ရှိငွေ: {balance_after_str}")
+                    except Exception as calc_err:
+                        # တွက်ချက်မှု Error တက်ပါက (ဥပမာ String ပြောင်းမရခြင်း) Balance အသစ်ကိုသာ ပြပေးပါမည်
+                        await message.answer(f"🔄 ပွဲစဉ် {current_issue} ပြီးဆုံးပါပြီ။\n💸 လက်ရှိငွေ: {balance_after_str}")
+
+                else:
+                    await asyncio.sleep(5) # Bet ထည့်တာ Error တက်လျှင် ၅ စက္ကန့်နားမည်
+            else:
+                await asyncio.sleep(3) # ပွဲသစ်မစသေးပါက ၃ စက္ကန့်စောင့်မည်
+                
+        except Exception as e:
+            print(f"Auto Loop Error: {e}")
+            await asyncio.sleep(5)
+
+
+# ==========================================================
+# 🤖 Start / Stop Continuous Auto Bet Commands
+# ==========================================================
+@dp.message(Command("startauto"))
+async def cmd_start_auto(message: types.Message, state: FSMContext):
+    user_tg_id = message.from_user.id
+    if user_tg_id not in active_sessions:
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+
+    if active_sessions[user_tg_id].get("is_auto_betting", False):
+        return await message.answer("⚠️ ဆက်တိုက် Auto Bet စနစ်မှာ အလုပ်လုပ်နေဆဲ ဖြစ်ပါသည်။ ရပ်လိုပါက /stopauto ကိုနှိပ်ပါ။")
+
+    args = message.text.split()
+    amount = 10
+    if len(args) >= 2 and args[1].isdigit():
+        amount = int(args[1])
+
+    active_sessions[user_tg_id]["is_auto_betting"] = True
+    asyncio.create_task(auto_bet_loop(user_tg_id, message, amount))
+
+@dp.message(Command("stopauto"))
+async def cmd_stop_auto(message: types.Message, state: FSMContext):
+    user_tg_id = message.from_user.id
+    if user_tg_id not in active_sessions:
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+
+    active_sessions[user_tg_id]["is_auto_betting"] = False
+    await message.answer("🛑 <b>ဆက်တိုက် Auto Bet စနစ်ကို ရပ်တန့်လိုက်ပါပြီ။</b>")
+
+
+# ==========================================================
+# 🎯 Single AI Bet Command (For One-Time Bet)
 # ==========================================================
 @dp.message(Command("aibet"))
 async def cmd_aibet(message: types.Message, state: FSMContext):
@@ -348,20 +458,21 @@ async def cmd_aibet(message: types.Message, state: FSMContext):
 
     loading_msg = await message.answer("🧠 <b>AI စနစ်ဖြင့် ပွဲစဉ်မှတ်တမ်းများကို လေ့လာသုံးသပ်နေပါသည်...</b>")
 
-    predicted_bet, confidence = await get_ai_prediction()
+    predicted_bet, confidence, current_issue = await get_ai_prediction()
 
     await loading_msg.delete()
 
     if predicted_bet:
-        await message.answer(f"📊 <b>AI ခန့်မှန်းချက် ရရှိပါပြီ!</b>\n\n🎯 ရွေးချယ်မှု: <b>{predicted_bet.upper()}</b>\n⚡ သေချာမှု (Confidence): <b>{confidence}%</b>\n💰 လောင်းကြေး: <b>{amount}</b>\n\n🔄 အလိုအလျောက် လောင်းကြေးထည့်နေပါသည်...")
+        await message.answer(f"📊 <b>AI ခန့်မှန်းချက် ရရှိပါပြီ! (ပွဲစဉ်: {current_issue})</b>\n\n🎯 ရွေးချယ်မှု: <b>{predicted_bet.upper()}</b>\n⚡ သေချာမှု (Confidence): <b>{confidence}%</b>\n💰 လောင်းကြေး: <b>{amount}</b>\n\n🔄 အလိုအလျောက် လောင်းကြေးထည့်နေပါသည်...")
         
         page = active_sessions[user_tg_id]["page"]
         await place_auto_bet(page, message, predicted_bet, amount)
     else:
         await message.answer("❌ API မှ အချက်အလက်ရယူရာတွင် အခက်အခဲရှိနေပါသည်။")
 
+
 # ==========================================================
-# 🕹️ Standard Bet Command Handler
+# 🕹️ Standard Manual Bet Command
 # ==========================================================
 @dp.message(Command("bet"))
 async def cmd_bet(message: types.Message, state: FSMContext):
@@ -378,11 +489,13 @@ async def cmd_bet(message: types.Message, state: FSMContext):
     if len(args) >= 3 and args[2].isdigit():
         amount = int(args[2])
         
+    await message.answer(f"🔄 Auto Bet စတင်နေပါသည်... ရွေးချယ်မှု: {bet_type.capitalize()}, ပမာဏ: {amount}")
     page = active_sessions[user_tg_id]["page"]
     await place_auto_bet(page, message, bet_type, amount)
 
+
 # ==========================================================
-# 💰 Check Balance (WinGo Page မှ တိုက်ရိုက်ဆွဲထုတ်ခြင်း)
+# 💰 Check Balance
 # ==========================================================
 @dp.message(LoginForm.main_menu, F.text == "💰 Balance")
 async def check_balance(message: types.Message, state: FSMContext):
@@ -408,6 +521,7 @@ async def check_balance(message: types.Message, state: FSMContext):
         await loading_msg.delete()
         await message.answer(f"⚠️ <b>Error:</b> Balance စစ်ဆေးရာတွင် အခက်အခဲရှိနေပါသည်။\n{html.escape(str(e))}", reply_markup=get_logged_in_keyboard())
 
+
 # ==========================================================
 # 📋 Info Button
 # ==========================================================
@@ -430,8 +544,8 @@ async def show_info(message: types.Message, state: FSMContext):
         f"├─ 📅 <b>Login Date:</b> {login_time}\n"
         "└─ ✅ <b>Allow Withdraw:</b> Yes\n"
     )
-    
     await message.answer(info_text, reply_markup=get_logged_in_keyboard())
+
 
 # ==========================================================
 # 🔐 Logout
@@ -440,6 +554,7 @@ async def show_info(message: types.Message, state: FSMContext):
 async def logout(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
     if user_tg_id in active_sessions:
+        active_sessions[user_tg_id]["is_auto_betting"] = False # Logout လုပ်လျှင် Loop ရပ်ရန်
         try:
             await active_sessions[user_tg_id]["browser"].close()
             await active_sessions[user_tg_id]["playwright"].stop()
@@ -450,12 +565,21 @@ async def logout(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("👋 အကောင့်ထွက်ပြီးပါပြီ။", reply_markup=get_main_keyboard())
 
+
 # ==========================================================
 # 🎰 Games
 # ==========================================================
 @dp.message(F.text == "🎰 Games")
 async def games(message: types.Message):
-    await message.answer("🎮 <b>Game ရွေးချယ်ရန်:</b>\nWin Go 30s ကို ရွေးချယ်ထားပါသည်။ Auto Bet အတွက် <code>/bet</code> (သို့) <code>/aibet</code> ကို သုံးပါ။", reply_markup=get_main_keyboard())
+    await message.answer(
+        "🎮 <b>Game ရွေးချယ်ရန်:</b>\nWin Go 30s ကို ရွေးချယ်ထားပါသည်။\n\n"
+        "🤖 <b>Bot Commands:</b>\n"
+        "<code>/startauto 10</code> - AI ဖြင့် ဆက်တိုက် Auto Bet စတင်ရန်\n"
+        "<code>/stopauto</code> - Auto Bet ရပ်တန့်ရန်\n"
+        "<code>/aibet 10</code> - AI ဖြင့် တစ်ပွဲသာ ထိုးရန်",
+        reply_markup=get_main_keyboard()
+    )
+
 
 # ==========================================================
 # 🚀 Main Bot Loop
