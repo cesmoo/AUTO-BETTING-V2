@@ -316,7 +316,7 @@ async def get_latest_game_result(target_issue):
     return "? | ?"
 
 # ==========================================================
-# 🧠 AI Prediction API Fetching Logic
+# 🧠 AI Prediction API Fetching Logic (Issue Number Fixed)
 # ==========================================================
 async def get_ai_prediction():
     url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
@@ -338,7 +338,11 @@ async def get_ai_prediction():
         records = api_result.get('data', {}).get('list', [])
         
         if records:
-            latest_issue = records[0]['issueNumber']
+            last_completed_issue = records[0]['issueNumber']
+            
+            # 🛑 ပြင်ဆင်ချက်: နောက်ထိုးမည့်ပွဲစဉ်သည် နောက်ဆုံးပြီးသွားသောပွဲစဉ် + 1 ဖြစ်သည်
+            next_issue = str(int(last_completed_issue) + 1)
+            
             recent_numbers = [int(item['number']) for item in records[:5]]
             big_count = sum(1 for n in recent_numbers if n >= 5)
             small_count = 5 - big_count
@@ -346,7 +350,7 @@ async def get_ai_prediction():
             prediction_choice = "big" if big_count > small_count else "small"
             confidence = random.randint(75, 95) 
             
-            return prediction_choice, confidence, latest_issue
+            return prediction_choice, confidence, next_issue
         else:
             return None, 0, None
 
