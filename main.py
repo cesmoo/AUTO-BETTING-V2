@@ -22,6 +22,9 @@ from playwright.async_api import async_playwright
 # Database ကို သီးသန့်ဖိုင်မှ ခေါ်ယူအသုံးပြုခြင်း
 import database as db 
 
+# AI Engines များကို ချိတ်ဆက်ခြင်း 👈
+import ai_engines
+
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -51,7 +54,7 @@ class LoginForm(StatesGroup):
     enter_password = State()
     main_menu = State()
     enter_bet_sequence = State() 
-    enter_profit_target = State() # 👈 Profit Target သတ်မှတ်ရန် State အသစ်
+    enter_profit_target = State()
 
 # ==========================================================
 # ⌨️ Keyboards
@@ -74,20 +77,29 @@ def get_logged_in_keyboard():
             [KeyboardButton(text="📋 Info"), KeyboardButton(text="💰 Balance"), KeyboardButton(text="📊 Status")], 
             [KeyboardButton(text="▶️ Start Auto-Bet"), KeyboardButton(text="🛑 Stop Auto-Bet")],
             [KeyboardButton(text="🎰 Games"), KeyboardButton(text="🤖 AI Mode")],
-            [KeyboardButton(text="⚙️ Set Bet-Size"), KeyboardButton(text="🎯 Profit Target")], # 👈 Profit Target ထည့်သွင်းထားသည်
+            [KeyboardButton(text="⚙️ Set Bet-Size"), KeyboardButton(text="🎯 Profit Target")], 
             [KeyboardButton(text="🔐 Logout")]
         ],
         resize_keyboard=True
     )
 
+# 👈 AI Mode (၁၆) မျိုးအတွက် Keyboard Dynamic ထုတ်ပေးခြင်း
 def get_ai_mode_keyboard():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🧠 Basic Trend AI"), KeyboardButton(text="🚀 ChatGPT Mode")],
-            [KeyboardButton(text="🌌 Gemini Mode"), KeyboardButton(text="🔙 ပင်မမီနူးသို့")]
-        ],
-        resize_keyboard=True
-    )
+    modes = list(ai_engines.AI_MODES.values())
+    keyboard = []
+    row = []
+    for mode in modes:
+        row.append(KeyboardButton(text=mode["name"]))
+        if len(row) == 2:
+            keyboard.append(row)
+            row = []
+    if row:
+        keyboard.append(row)
+    keyboard.append([KeyboardButton(text="🔙 ပင်မမီနူးသို့")])
+    return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
+
+# Valid AI names များကို စစ်ဆေးရန် List ဆွဲထုတ်ခြင်း
+VALID_AI_NAMES = [m["name"] for m in ai_engines.AI_MODES.values()]
 
 # ==========================================================
 # 🤖 Command Handlers
@@ -199,7 +211,11 @@ async def process_password(message: types.Message, state: FSMContext):
             await page.wait_for_timeout(2000)
 
             db_user = await db.get_user(user_tg_id)
-            ai_mode = db_user.get("ai_mode", "🧠 Basic Trend AI") if db_user else "🧠 Basic Trend AI"
+            ai_mode = db_user.get("ai_mode", "🎯 Pattern AI") if db_user else "🎯 Pattern AI"
+            
+            # DB ထဲကအဟောင်းဖြစ်နေခဲ့ရင် Default ပြန်ထားရန်
+            if ai_mode not in VALID_AI_NAMES:
+                ai_mode = "🎯 Pattern AI"
 
             await db.save_user_login(user_tg_id, username, user_id.strip(), nickname.strip(), balance_text.strip(), site_login_time, ai_mode)
 
@@ -216,8 +232,8 @@ async def process_password(message: types.Message, state: FSMContext):
                 "ai_mode": ai_mode,
                 "bet_sequence": [10],           
                 "current_bet_step": 0,          
-                "profit_target": 0,             # 👈 Default Target: 0 (Disabled)
-                "start_balance": 0.0            # 👈 Tracker for starting balance
+                "profit_target": 0,             
+                "start_balance": 0.0            
             }
 
             await message.answer("✅ <b>LOGIN SUCCESSFUL</b>\nသင့်အကောင့်အချက်အလက်များကို Database တွင် မှတ်တမ်းတင်ထားပါသည်။", reply_markup=get_logged_in_keyboard())
@@ -280,24 +296,22 @@ async def process_profit_target(message: types.Message, state: FSMContext):
         await message.answer("✅ <b>Profit Target စနစ်ကို ပိတ်လိုက်ပါပြီ။</b>", reply_markup=get_logged_in_keyboard())
 
 # ==========================================================
-# 🤖 AI Mode Selection Handlers
+# 🤖 AI Mode Selection Handlers (Updated)
 # ==========================================================
 @dp.message(F.text == "🤖 AI Mode")
 async def cmd_ai_mode(message: types.Message):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
         
-    current_mode = active_sessions[user_tg_id].get("ai_mode", "🧠 Basic Trend AI")
+    current_mode = active_sessions[user_tg_id].get("ai_mode", "🎯 Pattern AI")
     await message.answer(
         f"🤖 <b>အသုံးပြုလိုသော AI Prediction စနစ်ကို ရွေးချယ်ပါ:</b>\n\n"
         f"လက်ရှိ အသုံးပြုနေသော စနစ်: <b>{current_mode}</b>\n\n"
-        "1️⃣ <b>Basic Trend AI:</b> နောက်ဆုံး ၅ ပွဲကိုကြည့်၍ တွက်ချက်သောစနစ်။\n"
-        "2️⃣ <b>ChatGPT Mode:</b> အနိုင်အရှုံး Pattern ရှာဖွေတွက်ချက်သောစနစ်။\n"
-        "3️⃣ <b>Gemini Mode:</b> ပွဲစဉ် ၁၀ ပွဲစာကို ခြုံငုံသုံးသပ်သောစနစ်။",
+        "အောက်ပါ Menu မှ မိမိနှစ်သက်ရာ AI Model ကို ရွေးချယ်နိုင်ပါသည်။",
         reply_markup=get_ai_mode_keyboard()
     )
 
-@dp.message(F.text.in_(["🧠 Basic Trend AI", "🚀 ChatGPT Mode", "🌌 Gemini Mode"]))
+@dp.message(F.text.in_(VALID_AI_NAMES))
 async def set_ai_mode(message: types.Message):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
@@ -398,7 +412,7 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
         return False
 
 # ==========================================================
-# 📊 API Fetching (Updated Timestamps to prevent cache delay)
+# 📊 API Fetching & New AI Engine Integration
 # ==========================================================
 async def get_latest_game_result(target_issue):
     url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
@@ -410,7 +424,7 @@ async def get_latest_game_result(target_issue):
         'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
         'random': '7bc385b8267d48ebbc62fe04296cbed4',
         'signature': '2B34898B971F29208D293D1E530F8627', 
-        'timestamp': int(time.time()), # 👈 Dynamic Timestamp to bypass delay
+        'timestamp': int(time.time()), 
     }
     try:
         async with aiohttp.ClientSession() as session:
@@ -431,11 +445,12 @@ async def get_ai_prediction(user_tg_id):
         'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjQzMjUwIiwibmJmIjoiMTc4MzY0MzI1MCIsImV4cCI6IjE3ODM2NDUwNTAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgNzoyNzozMCBBTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgNjo1NzozMCBBTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6Ijk3IiwiVG9rZW5UeXBlIjoiQWNjZXNzX1Rva2VuIiwiUGhvbmVUeXBlIjoiMSIsIlVzZXJUeXBlIjoiMCIsIlVzZXJOYW1lMiI6InB5YWVzb25lNXBzcEB5YWhvby5jb20iLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.C-FbAazz7HkLeQ5L5eISGHGJCdwarGdz4A3v9XyvqCE',
         'content-type': 'application/json;charset=UTF-8',
     }
+    # 👈 AI တွက်ချက်မှုအတွက် Data လုံလောက်စေရန် pageSize ကို 30 ထိ တိုးထားသည်
     json_data = {
-        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+        'pageSize': 30, 'pageNo': 1, 'typeId': 30, 'language': 7,
         'random': 'e431a6544cde4cbb8e09a4c01199b75b',
         'signature': '1668945A145F050B049ED587E6E9E0E7', 
-        'timestamp': int(time.time()), # 👈 Dynamic Timestamp
+        'timestamp': int(time.time()), 
     }
 
     try:
@@ -447,28 +462,25 @@ async def get_ai_prediction(user_tg_id):
         if records:
             last_completed_issue = records[0]['issueNumber']
             next_issue = str(int(last_completed_issue) + 1)
-            ai_mode = active_sessions.get(user_tg_id, {}).get("ai_mode", "🧠 Basic Trend AI")
             
-            if ai_mode == "🚀 ChatGPT Mode":
-                recent_7 = [int(item['number']) for item in records[:7]] if len(records) >= 7 else [int(item['number']) for item in records]
-                big_count = sum(1 for n in recent_7 if n >= 5)
-                prediction_choice = "big" if big_count >= 4 else "small"
-                confidence = random.randint(82, 98)
-                ai_name = "ChatGPT-4"
-            elif ai_mode == "🌌 Gemini Mode":
-                recent_10 = [int(item['number']) for item in records]
-                big_count = sum(1 for n in recent_10 if n >= 5)
-                prediction_choice = "big" if big_count > (len(recent_10) - big_count) else "small"
-                confidence = random.randint(80, 95)
-                ai_name = "Gemini Pro"
-            else:
-                recent_5 = [int(item['number']) for item in records[:5]] if len(records) >= 5 else [int(item['number']) for item in records]
-                big_count = sum(1 for n in recent_5 if n >= 5)
-                prediction_choice = "big" if big_count > (len(recent_5) - big_count) else "small"
-                confidence = random.randint(70, 85)
-                ai_name = "Basic AI"
+            # API မှ ရလာသော Data များကို ai_engines လက်ခံနိုင်သည့် Format သို့ ပြောင်းလဲခြင်း
+            history_docs = []
+            for item in records:
+                num = int(item['number'])
+                history_docs.append({"size": "BIG" if num >= 5 else "SMALL", "number": num})
             
-            return prediction_choice, confidence, next_issue, ai_name
+            # 👈 User ရွေးချယ်ထားသော AI ကို ဆွဲယူပြီး ai_engines သို့ ပို့ပေးခြင်း
+            user_ai_name = active_sessions.get(user_tg_id, {}).get("ai_mode", "🎯 Pattern AI")
+            
+            mode_key = "pattern"
+            for key, val in ai_engines.AI_MODES.items():
+                if val["name"] == user_ai_name:
+                    mode_key = key
+                    break
+                    
+            predicted_size, display_name, confidence, desc = ai_engines.get_prediction(history_docs, mode_key)
+            
+            return predicted_size.lower(), confidence, next_issue, user_ai_name
         else:
             return None, 0, None, None
     except Exception as e:
@@ -513,7 +525,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                                 active_sessions[user_tg_id]["is_auto_betting"] = False
                                 break
                     except:
-                        pass # Ignore pre-check error and continue
+                        pass 
 
                     betting_msg = (
                         f"• WINGO_30S : {current_issue}\n"
@@ -529,18 +541,17 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                     if success:
                         last_betted_issue = current_issue
                         
-                        # 🛑 Dynamic Delay Fix: Fixed Wait ကိုဖြုတ်ပြီး API ရလဒ်ထွက်သည်အထိ (၂) စက္ကန့်တစ်ခါ Polling လုပ်မည်
+                        # Dynamic Delay Fix
                         actual_result = "? | ?"
-                        for _ in range(20): # အများဆုံး 40 စက္ကန့် စောင့်မည်
+                        for _ in range(20): 
                             if not active_sessions.get(user_tg_id, {}).get("is_auto_betting", False):
-                                break # User ကရပ်လိုက်ရင် ချက်ချင်းထွက်မည်
+                                break 
                                 
                             await asyncio.sleep(2)
                             actual_result = await get_latest_game_result(current_issue)
                             if actual_result != "? | ?":
-                                break # ရလဒ်ထွက်လာပါက Loop မှ ချက်ချင်းထွက်မည်
+                                break 
                         
-                        # Update Balance
                         balance_after_str = "0"
                         new_bal_val = 0.0
                         try:
@@ -670,7 +681,6 @@ async def btn_start_auto(message: types.Message, state: FSMContext):
         active_sessions[user_tg_id]["bet_sequence"] = [10]
         active_sessions[user_tg_id]["current_bet_step"] = 0
 
-    # 🛑 Auto Bet စတင်ချိန်တွင် လက်ရှိ Balance ကို Start Balance အဖြစ် မှတ်သားထားမည် (Target တွက်ရန်)
     try:
         page = active_sessions[user_tg_id]["page"]
         bal_el = page.locator('.Wallet__C-balance-l1 div').first
@@ -700,7 +710,7 @@ async def btn_status(message: types.Message, state: FSMContext):
 
     session = active_sessions[user_tg_id]
     is_auto = "Running 🟢" if session.get("is_auto_betting", False) else "Stopped 🔴"
-    ai_mode = session.get("ai_mode", "🧠 Basic Trend AI")
+    ai_mode = session.get("ai_mode", "🎯 Pattern AI")
     
     current_seq = session.get("bet_sequence", [10])
     seq_str = "-".join(map(str, current_seq))
@@ -709,7 +719,6 @@ async def btn_status(message: types.Message, state: FSMContext):
     profit_target = session.get("profit_target", 0)
     start_bal = session.get("start_balance", 0.0)
     
-    # Update real-time balance
     current_bal_val = start_bal
     current_bal_str = "0.00 Ks"
     try:
