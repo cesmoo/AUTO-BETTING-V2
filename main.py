@@ -548,22 +548,19 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
             except: pass
         return False
 
-
-
 # ==========================================================
-# 📊 API Fetching
+# 📊 Get Actual Game Result from API
 # ==========================================================
 async def get_latest_game_result(target_issue):
     url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
     headers = {
-        'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjg3MTIwIiwibmJmIjoiMTc4MzY4NzEyMCIsImV4cCI6IjE3ODM2ODg5MjAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgNzozODo0MCBQTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgNzowODo0MCBQTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6IjExNCIsIlRva2VuVHlwZSI6IkFjY2Vzc19Ub2tlbiIsIlBob25lVHlwZSI6IjEiLCJVc2VyVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiJweWFlc29uZTVwc3BAeWFob28uY29tIiwiaXNzIjoiand0SXNzdWVyIiwiYXVkIjoibG90dGVyeVRpY2tldCJ9.0ra9iMFxFUWv2F94_HaOtY7SRSNoOqwIzWe9EJsaD5w',
+        'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjY1OTAyIiwibmJmIjoiMTc4MzY2NTkwMiIsImV4cCI6IjE3ODM2Njc3MDIiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgMTo0NTowMiBQTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgMToxNTowMiBQTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTg4LjI0NS44Ny4zIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6IjEwNiIsIlRva2VuVHlwZSI6IkFjY2Vzc19Ub2tlbiIsIlBob25lVHlwZSI6IjEiLCJVc2VyVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiJweWFlc29uZTVwc3BAeWFob28uY29tIiwiaXNzIjoiand0SXNzdWVyIiwiYXVkIjoibG90dGVyeVRpY2tldCJ9.U-YRQvRv20OmGnLmm_DLdS9D-jDyNhCqWhFk4M1zmkc',
         'content-type': 'application/json;charset=UTF-8',
     }
     json_data = {
         'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
-        'random': 'c556c164685d4db0a32621811f779c97',
-        'signature': 'E5AD1D4A06A2BC6AD50AE40E67B7B2D5', 
-        'timestamp': 1783687132, 
+        'random': '7bc385b8267d48ebbc62fe04296cbed4',
+        'signature': '2B34898B971F29208D293D1E530F8627', 'timestamp': 1783665931,
     }
     try:
         async with aiohttp.ClientSession() as session:
@@ -578,17 +575,19 @@ async def get_latest_game_result(target_issue):
     except: pass
     return "? | ?"
 
+# ==========================================================
+# 🧠 AI Prediction API Fetching Logic
+# ==========================================================
 async def get_ai_prediction(user_tg_id):
     url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
     headers = {
-        'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjg3MTIwIiwibmJmIjoiMTc4MzY4NzEyMCIsImV4cCI6IjE3ODM2ODg5MjAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgNzozODo0MCBQTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgNzowODo0MCBQTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6IjExNCIsIlRva2VuVHlwZSI6IkFjY2Vzc19Ub2tlbiIsIlBob25lVHlwZSI6IjEiLCJVc2VyVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiJweWFlc29uZTVwc3BAeWFob28uY29tIiwiaXNzIjoiand0SXNzdWVyIiwiYXVkIjoibG90dGVyeVRpY2tldCJ9.0ra9iMFxFUWv2F94_HaOtY7SRSNoOqwIzWe9EJsaD5w',
+        'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjQzMjUwIiwibmJmIjoiMTc4MzY0MzI1MCIsImV4cCI6IjE3ODM2NDUwNTAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgNzoyNzozMCBBTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgNjo1NzozMCBBTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6Ijk3IiwiVG9rZW5UeXBlIjoiQWNjZXNzX1Rva2VuIiwiUGhvbmVUeXBlIjoiMSIsIlVzZXJUeXBlIjoiMCIsIlVzZXJOYW1lMiI6InB5YWVzb25lNXBzcEB5YWhvby5jb20iLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.C-FbAazz7HkLeQ5L5eISGHGJCdwarGdz4A3v9XyvqCE',
         'content-type': 'application/json;charset=UTF-8',
     }
     json_data = {
-        'pageSize': 30, 'pageNo': 1, 'typeId': 30, 'language': 7,
-        'random': 'c556c164685d4db0a32621811f779c97',
-        'signature': 'E5AD1D4A06A2BC6AD50AE40E67B7B2D5', 
-        'timestamp': 1783687132, 
+        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+        'random': 'e431a6544cde4cbb8e09a4c01199b75b',
+        'signature': '1668945A145F050B049ED587E6E9E0E7', 'timestamp': 1000000000,
     }
 
     try:
