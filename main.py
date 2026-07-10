@@ -51,7 +51,7 @@ def get_site_keyboard():
 def get_logged_in_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📋 Info")], 
+            [KeyboardButton(text="📋 Info"), KeyboardButton(text="💰 Balance")], 
             [KeyboardButton(text="🎰 Games")],
             [KeyboardButton(text="🔐 Logout")]
         ],
@@ -313,6 +313,38 @@ async def cmd_bet(message: types.Message, state: FSMContext):
     page = active_sessions[user_tg_id]["page"]
     await place_auto_bet(page, message, bet_type, amount)
 
+# ==========================================================
+# 💰 Check Balance (WinGo Page မှ တိုက်ရိုက်ဆွဲထုတ်ခြင်း)
+# ==========================================================
+@dp.message(LoginForm.main_menu, F.text == "💰 Balance")
+async def check_balance(message: types.Message, state: FSMContext):
+    user_tg_id = message.from_user.id
+    
+    # Session ရှိ/မရှိ စစ်ဆေးခြင်း
+    if user_tg_id not in active_sessions:
+        return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
+
+    loading_msg = await message.answer("🔄 <b>လက်ကျန်ငွေ (Balance) ကို စစ်ဆေးနေပါသည်...</b>")
+    page = active_sessions[user_tg_id]["page"]
+
+    try:
+        balance_text = "0.00 Ks"
+        
+        # HTML Structure အရ '.Wallet__C-balance-l1' အောက်က 'div' ကို ဖတ်ပါမည်
+        balance_el = page.locator('.Wallet__C-balance-l1 div').first
+        
+        if await balance_el.is_visible(timeout=3000):
+            balance_text = await balance_el.inner_text()
+
+        # နောက်ပိုင်း Info ခလုတ်နှိပ်လျှင်ပါ Balance အသစ်ပေါ်စေရန် State ကို Update လုပ်ပါမည်
+        await state.update_data(balance=balance_text.strip())
+
+        await loading_msg.delete()
+        await message.answer(f"💰 <b>သင့်ရဲ့ လက်ရှိ လက်ကျန်ငွေ:</b> {balance_text.strip()}", reply_markup=get_logged_in_keyboard())
+
+    except Exception as e:
+        await loading_msg.delete()
+        await message.answer(f"⚠️ <b>Error:</b> Balance စစ်ဆေးရာတွင် အခက်အခဲရှိနေပါသည်။\n{html.escape(str(e))}", reply_markup=get_logged_in_keyboard())
 
 # ==========================================================
 # 📋 Info Button
