@@ -374,7 +374,7 @@ async def process_password(message: types.Message, state: FSMContext):
         main_url = "https://www.777bigwingame.app/#/main"
         game_url = "https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1"
 
-    loading_msg = await message.answer(f"{site_name} သို့ ꜱɪɢɴɪɴɢ ɪɴ... ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ.")
+    loading_msg = await message.answer(f"{site_name} ꜱɪɢɴɪɴɢ ɪɴ... ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ.")
     
     p = await async_playwright().start()
     browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
@@ -551,10 +551,12 @@ async def process_toggle_aipred(callback: types.CallbackQuery):
 async def prediction_broadcast_loop(user_tg_id, message: types.Message):
     api_error_count = 0
     
-    # Win / Lose Streak များကို အစပြုရန် (မရှိသေးပါက)
-    if "pred_win_streak" not in active_sessions.get(user_tg_id, {}):
-        active_sessions[user_tg_id]["pred_win_streak"] = 0
-        active_sessions[user_tg_id]["pred_lose_streak"] = 0
+    # ခြေရာခံမည့် Current & Longest Streaks များကို အစပြုရန်
+    if "current_win_streak" not in active_sessions.get(user_tg_id, {}):
+        active_sessions[user_tg_id]["current_win_streak"] = 0
+        active_sessions[user_tg_id]["current_lose_streak"] = 0
+        active_sessions[user_tg_id]["longest_win_streak"] = 0
+        active_sessions[user_tg_id]["longest_lose_streak"] = 0
 
     while active_sessions.get(user_tg_id, {}).get("is_ai_prediction_enabled", False):
         try:
@@ -566,15 +568,15 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                 if current_issue != last_issue:
                     active_sessions[user_tg_id]["last_predicted_issue"] = current_issue
                     
-                    # လက်ရှိ Streak များကို ယူရန်
-                    w_streak = active_sessions[user_tg_id].get("pred_win_streak", 0)
-                    l_streak = active_sessions[user_tg_id].get("pred_lose_streak", 0)
+                    # Longest Streaks များကို ယူရန်
+                    long_w = active_sessions[user_tg_id].get("longest_win_streak", 0)
+                    long_l = active_sessions[user_tg_id].get("longest_lose_streak", 0)
                     
                     pred_msg = await message.answer(
                         f"🔮 <b>AI Prediction (Live)</b>\n"
                         f"━━━━━━━━━━━━━━━\n"
                         f"• WINGO_30S : <code>{current_issue}</code>\n"
-                        f"• Prediction : <b>{predicted_bet.upper()}</b>〔 {w_streak} 〕|〔 {l_streak} 〕\n"
+                        f"• Prediction : <b>{predicted_bet.upper()}</b>〔 {long_w} 〕|〔 {long_l} 〕\n"
                         f"• Status : ⏳ <b>Waiting for result...</b>"
                     )
                     
@@ -591,25 +593,37 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                         actual_size = actual_result.split(" | ")[1].strip().lower()
                         if predicted_bet.lower() == actual_size:
                             status_text = f"✅ <b>WIN ({actual_result})</b>"
-                            active_sessions[user_tg_id]["pred_win_streak"] += 1
-                            active_sessions[user_tg_id]["pred_lose_streak"] = 0 # နိုင်သွားရင် Lose Streak ကို 0 ပြန်ထားမည်
+                            
+                            # Win တွက်ချက်မှုများ
+                            active_sessions[user_tg_id]["current_win_streak"] += 1
+                            active_sessions[user_tg_id]["current_lose_streak"] = 0
+                            
+                            # လက်ရှိ Win Streak သည် Longest ထက်များသွားပါက Update လုပ်မည်
+                            if active_sessions[user_tg_id]["current_win_streak"] > active_sessions[user_tg_id]["longest_win_streak"]:
+                                active_sessions[user_tg_id]["longest_win_streak"] = active_sessions[user_tg_id]["current_win_streak"]
                         else:
                             status_text = f"❌ <b>LOSE ({actual_result})</b>"
-                            active_sessions[user_tg_id]["pred_lose_streak"] += 1
-                            active_sessions[user_tg_id]["pred_win_streak"] = 0 # ရှုံးသွားရင် Win Streak ကို 0 ပြန်ထားမည်
+                            
+                            # Lose တွက်ချက်မှုများ
+                            active_sessions[user_tg_id]["current_lose_streak"] += 1
+                            active_sessions[user_tg_id]["current_win_streak"] = 0
+                            
+                            # လက်ရှိ Lose Streak သည် Longest ထက်များသွားပါက Update လုပ်မည်
+                            if active_sessions[user_tg_id]["current_lose_streak"] > active_sessions[user_tg_id]["longest_lose_streak"]:
+                                active_sessions[user_tg_id]["longest_lose_streak"] = active_sessions[user_tg_id]["current_lose_streak"]
                     else:
                         status_text = "⚖️ <b>DRAW (Timeout)</b>"
                         
-                    # ရလဒ်ထွက်ပြီးနောက် Update ဖြစ်သွားသော Streak များကို ပြန်ယူရန်
-                    new_w_streak = active_sessions[user_tg_id].get("pred_win_streak", 0)
-                    new_l_streak = active_sessions[user_tg_id].get("pred_lose_streak", 0)
+                    # ရလဒ်ထွက်ပြီးနောက် Update ဖြစ်သွားသော Longest Streaks များကို ပြန်ယူရန်
+                    new_long_w = active_sessions[user_tg_id].get("longest_win_streak", 0)
+                    new_long_l = active_sessions[user_tg_id].get("longest_lose_streak", 0)
                         
                     try:
                         await pred_msg.edit_text(
                             f"🔮 <b>AI Prediction (Live)</b>\n"
                             f"━━━━━━━━━━━━━━━\n"
                             f"• WINGO_30S : <code>{current_issue}</code>\n"
-                            f"• Prediction : <b>{predicted_bet.upper()}</b>〔 {new_w_streak} 〕|〔 {new_l_streak} 〕\n"
+                            f"• Prediction : <b>{predicted_bet.upper()}</b>〔 {new_long_w} 〕|〔 {new_long_l} 〕\n"
                             f"• Status : {status_text}"
                         )
                     except Exception: 
@@ -626,6 +640,7 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                 
         except Exception: 
             await asyncio.sleep(5)
+
 
 
 # ==========================================================
