@@ -945,6 +945,17 @@ async def get_ai_prediction(user_tg_id):
         return None, 0, None, None
 
 # ==========================================================
+# 🌟 Premium Emojis Variables
+#===========================================================
+E_SETTING = '<tg-emoji emoji-id="5877260593903177342">⚙️</tg-emoji>'
+E_CROWN   = '<tg-emoji emoji-id="5807868868886009920">👑</tg-emoji>'
+E_LOSS    = '<tg-emoji emoji-id="5807461353799030682">💸</tg-emoji>'
+E_GRID    = '<tg-emoji emoji-id="5884290437459480896">🔠</tg-emoji>'
+E_EDIT    = '<tg-emoji emoji-id="5985774024968379294">📝</tg-emoji>'
+E_DOC     = '<tg-emoji emoji-id="5956561916573782596">📄</tg-emoji>'
+E_FLOWER  = '<tg-emoji emoji-id="5967574255670399788">🌸</tg-emoji>'
+
+# ==========================================================
 # 🔄 Continuous Auto Bet Loop Task 
 # ==========================================================
 async def auto_bet_loop(user_tg_id, message: types.Message):
@@ -1028,12 +1039,13 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                     except Exception: 
                         pass 
 
+                    # 📝 ပုံစံသစ်ဖြင့် လောင်းကြေးအချက်အလက်ကို ပြသခြင်း (Blockquote)
                     betting_msg = (
-                        f"• WINGO_30S : {current_issue}\n"
-                        f"• Model : {ai_name}\n"
-                        f"• Pred : {predicted_bet.upper()} | {current_amount} Ks\n"
-                        f"• Step : {step + 1}/{len(sequence)}\n"
-                        f"• Auto-Betting ✅"
+                        f"<blockquote>"
+                        f"{E_DOC} WINGO_30S : {current_issue}\n"
+                        f"{E_DOC} Series : Ai Prediction\n"
+                        f"{E_FLOWER} Pred : {predicted_bet.upper()} | {current_amount} Ks"
+                        f"</blockquote>"
                     )
                     await message.answer(betting_msg)
 
@@ -1054,10 +1066,12 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                                 break 
                         
                         balance_after_str = "0"
+                        new_bal_val = 0.0
                         try:
                             bal_el = page.locator('.Wallet__C-balance-l1 div').first
                             if await bal_el.is_visible(timeout=2000):
                                 balance_after_str = await bal_el.inner_text()
+                                new_bal_val = extract_balance(balance_after_str)
                         except Exception: 
                             pass
 
@@ -1065,19 +1079,18 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                             actual_size = actual_result.split(" | ")[1].strip().lower() 
                             predicted_size = predicted_bet.lower()
                             
-                            # 👈 Profit အတိအကျ တွက်ချက်ခြင်း (Internal Tracking)
                             if predicted_size == actual_size:
                                 profit_amount = current_amount * 0.96
-                                status_title = f"✅ <b>WIN +{profit_amount:.2f} Ks</b>"
+                                status_title = f"{E_SETTING} <b>WIN</b> {E_CROWN} +{profit_amount:.2f} Ks"
                                 active_sessions[user_tg_id]["session_profit"] += profit_amount
                                 active_sessions[user_tg_id]["current_bet_step"] = 0 
                                 active_sessions[user_tg_id]["current_misses"] = 0 
                                 
                             elif actual_size == "?": 
-                                status_title = f"⚖️ <b>DRAW (Pending)</b>"
+                                status_title = f"{E_SETTING} <b>DRAW</b> (Pending)"
                                 
                             else:
-                                status_title = f"❌ <b>LOSE -{current_amount:.2f} Ks</b>"
+                                status_title = f"{E_SETTING} <b>LOSE</b> {E_LOSS} {current_amount:.2f} Ks"
                                 active_sessions[user_tg_id]["session_profit"] -= current_amount
                                 active_sessions[user_tg_id]["current_bet_step"] += 1
                                 if active_sessions[user_tg_id]["current_bet_step"] >= len(sequence): 
@@ -1089,13 +1102,16 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                             else:
                                 profit_display = f"{current_profit:,.2f} Ks"
                             
+                            # 📝 ပုံစံသစ်ဖြင့် ရလဒ်ကို ပြသခြင်း (Blockquote)
                             result_msg = (
+                                f"<blockquote>"
                                 f"{status_title}\n"
-                                f"━━━━━━━━━━━━━━━\n"
-                                f"• WINGO_30S : {current_issue}\n"
-                                f"• Result : {actual_result}\n"
-                                f"• Balance : {balance_after_str}\n"
-                                f"• Total Profit : {profit_display}"
+                                f"──────────────────\n"
+                                f"{E_GRID} WINGO_30S : {current_issue}\n"
+                                f"{E_GRID} Result : {actual_result}\n"
+                                f"{E_EDIT} Balance : K{new_bal_val:,.2f}\n"
+                                f"{E_EDIT} Total Profit : {profit_display}"
+                                f"</blockquote>"
                             )
                             await message.answer(result_msg)
                             await db.update_user_balance(user_tg_id, balance_after_str.strip())
@@ -1127,6 +1143,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
         except Exception as e:
             print(f"Auto Loop Error: {e}")
             await asyncio.sleep(5)
+
 
 # ==========================================================
 # ⚙️ Set Bet-Size Handlers
