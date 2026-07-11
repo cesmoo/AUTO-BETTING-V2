@@ -87,7 +87,10 @@ def get_main_keyboard():
 
 def get_site_keyboard():
     return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="777BIGWIN")], [KeyboardButton(text="🔙 နောက်သို့")]],
+        keyboard=[
+            [KeyboardButton(text="777BIGWIN"), KeyboardButton(text="6Lottery")], 
+            [KeyboardButton(text="🔙 နောက်သို့")]
+        ],
         resize_keyboard=True
     )
 
@@ -161,7 +164,7 @@ async def login_start(message: types.Message, state: FSMContext):
 
 @dp.message(LoginForm.select_site)
 async def process_site(message: types.Message, state: FSMContext):
-    if message.text == "ʙᴀᴄᴋ":
+    if message.text == "🔙 နောက်သို့":
         await state.clear()
         return await message.answer("Cancelled.", reply_markup=get_main_keyboard())
     await state.update_data(site=message.text)
@@ -182,9 +185,20 @@ async def process_password(message: types.Message, state: FSMContext):
     password = message.text
     data = await state.get_data()
     username = data.get('phone')
+    site_name = data.get('site', '777BIGWIN')
     user_tg_id = message.from_user.id
     
-    loading_msg = await message.answer("ꜱɪɢɴɪɴɢ ɪɴ... ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ.")
+    # 🌐 Site အလိုက် URL များ သတ်မှတ်ခြင်း
+    if site_name == "6Lottery":
+        login_url = "https://www.6win584.com/#/login"
+        main_url = "https://www.6win584.com/#/main"
+        game_url = "https://www.6win584.com/#/home/AllLotteryGames/WinGo?id=1"
+    else:
+        login_url = "https://www.777bigwingame.app/#/login"
+        main_url = "https://www.777bigwingame.app/#/main"
+        game_url = "https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1"
+
+    loading_msg = await message.answer(f"{site_name} သို့ ꜱɪɢɴɪɴɢ ɪɴ... ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ.")
     
     p = await async_playwright().start()
     browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
@@ -196,7 +210,7 @@ async def process_password(message: types.Message, state: FSMContext):
     page = await context.new_page()
     
     try:
-        await page.goto("https://www.777bigwingame.app/#/login", wait_until="networkidle", timeout=60000)
+        await page.goto(login_url, wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(3000)
 
         js_code = """
@@ -234,7 +248,7 @@ async def process_password(message: types.Message, state: FSMContext):
         
         if "login" not in page.url.lower():
             try:
-                await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
+                await page.goto(main_url, wait_until="networkidle")
                 await page.wait_for_timeout(3000)
             except: pass
 
@@ -252,7 +266,7 @@ async def process_password(message: types.Message, state: FSMContext):
                 if await balance_el.is_visible(timeout=2000): balance_text = await balance_el.inner_text()
             except: pass
 
-            await page.goto("https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1", wait_until="networkidle")
+            await page.goto(game_url, wait_until="networkidle")
             await page.wait_for_timeout(2000)
 
             db_user = await db.get_user(user_tg_id)
@@ -269,6 +283,7 @@ async def process_password(message: types.Message, state: FSMContext):
             )
 
             active_sessions[user_tg_id] = {
+                "site": site_name, # 👈 မှတ်သားထားမည်
                 "playwright": p,
                 "browser": browser,
                 "page": page,
@@ -284,7 +299,7 @@ async def process_password(message: types.Message, state: FSMContext):
                 "last_predicted_issue": None       
             }
 
-            await message.answer("𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦", reply_markup=get_logged_in_keyboard())
+            await message.answer(f"𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦 ({site_name})", reply_markup=get_logged_in_keyboard())
             await state.set_state(LoginForm.main_menu)
             
         else:
@@ -341,7 +356,7 @@ async def process_toggle_aipred(callback: types.CallbackQuery):
     else:
         await callback.answer("❌ AI Prediction ပြသခြင်းကို ပိတ်လိုက်ပါပြီ။", show_alert=True)
 
-# 🔮 Broadcast Loop (Only prints prediction, NO PLACE BET, Includes Win/Lose Check)
+# 🔮 Broadcast Loop
 async def prediction_broadcast_loop(user_tg_id, message: types.Message):
     api_error_count = 0
     while active_sessions.get(user_tg_id, {}).get("is_ai_prediction_enabled", False):
@@ -370,7 +385,7 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                         if not active_sessions.get(user_tg_id, {}).get("is_ai_prediction_enabled", False):
                             break
                         await asyncio.sleep(2)
-                        actual_result = await get_latest_game_result(current_issue)
+                        actual_result = await get_latest_game_result(current_issue, user_tg_id)
                         if actual_result != "? | ?":
                             break
                     
@@ -601,17 +616,32 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
 # ==========================================================
 # 📊 Get Actual Game Result from API
 # ==========================================================
-async def get_latest_game_result(target_issue):
-    url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
-    headers = {
-        'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjY1OTAyIiwibmJmIjoiMTc4MzY2NTkwMiIsImV4cCI6IjE3ODM2Njc3MDIiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgMTo0NTowMiBQTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgMToxNTowMiBQTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTg4LjI0NS44Ny4zIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6IjEwNiIsIlRva2VuVHlwZSI6IkFjY2Vzc19Ub2tlbiIsIlBob25lVHlwZSI6IjEiLCJVc2VyVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiJweWFlc29uZTVwc3BAeWFob28uY29tIiwiaXNzIjoiand0SXNzdWVyIiwiYXVkIjoibG90dGVyeVRpY2tldCJ9.U-YRQvRv20OmGnLmm_DLdS9D-jDyNhCqWhFk4M1zmkc',
-        'content-type': 'application/json;charset=UTF-8',
-    }
-    json_data = {
-        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
-        'random': '7bc385b8267d48ebbc62fe04296cbed4',
-        'signature': '2B34898B971F29208D293D1E530F8627', 'timestamp': 1783665931,
-    }
+async def get_latest_game_result(target_issue, user_tg_id):
+    site = active_sessions.get(user_tg_id, {}).get("site", "777BIGWIN")
+
+    if site == "6Lottery":
+        url = 'https://6lotteryapi.com/api/webapi/GetNoaverageEmerdList'
+        headers = {
+            'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNzQ3OTQ1IiwibmJmIjoiMTc4Mzc0Nzk0NSIsImV4cCI6IjE3ODM3NDk3NDUiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzExLzIwMjYgMTI6MzI6MjUgUE0iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJBY2Nlc3NfVG9rZW4iLCJVc2VySWQiOiIxMDc2NTk0IiwiVXNlck5hbWUiOiI5NTk2NzUzMjM4NzgiLCJVc2VyUGhvdG8iOiI3IiwiTmlja05hbWUiOiLhgJXhgLzhgIrhgLfhgLrhgIXhgK_hgLYiLCJBbW91bnQiOiI2ODIuMDAiLCJJbnRlZ3JhbCI6IjAiLCJMb2dpbk1hcmsiOiJINSIsIkxvZ2luVGltZSI6IjcvMTEvMjAyNiAxMjowMjoyNSBQTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6IjEzMCIsIlRva2VuVHlwZSI6IkFjY2Vzc19Ub2tlbiIsIlBob25lVHlwZSI6IjEiLCJVc2VyVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiIiLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.LcFWlrh3lOnhgdztdqGJv0idysPzMbzk5yHaW_mRPZA',
+            'content-type': 'application/json;charset=UTF-8',
+        }
+        json_data = {
+            'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+            'random': 'f8e6fe62969046bf875bd73756a0d058',
+            'signature': 'E156CA0133F342D84E376535EEE5CDD9', 'timestamp': 1783748130,
+        }
+    else:
+        url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
+        headers = {
+            'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjY1OTAyIiwibmJmIjoiMTc4MzY2NTkwMiIsImV4cCI6IjE3ODM2Njc3MDIiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgMTo0NTowMiBQTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgMToxNTowMiBQTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTg4LjI0NS44Ny4zIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6IjEwNiIsIlRva2VuVHlwZSI6IkFjY2Vzc19Ub2tlbiIsIlBob25lVHlwZSI6IjEiLCJVc2VyVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiJweWFlc29uZTVwc3BAeWFob28uY29tIiwiaXNzIjoiand0SXNzdWVyIiwiYXVkIjoibG90dGVyeVRpY2tldCJ9.U-YRQvRv20OmGnLmm_DLdS9D-jDyNhCqWhFk4M1zmkc',
+            'content-type': 'application/json;charset=UTF-8',
+        }
+        json_data = {
+            'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+            'random': '7bc385b8267d48ebbc62fe04296cbed4',
+            'signature': '2B34898B971F29208D293D1E530F8627', 'timestamp': 1783665931,
+        }
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, headers=headers, json=json_data) as response:
@@ -629,16 +659,30 @@ async def get_latest_game_result(target_issue):
 # 🧠 AI Prediction API Fetching Logic
 # ==========================================================
 async def get_ai_prediction(user_tg_id):
-    url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
-    headers = {
-        'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjQzMjUwIiwibmJmIjoiMTc4MzY0MzI1MCIsImV4cCI6IjE3ODM2NDUwNTAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgNzoyNzozMCBBTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgNjo1NzozMCBBTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6Ijk3IiwiVG9rZW5UeXBlIjoiQWNjZXNzX1Rva2VuIiwiUGhvbmVUeXBlIjoiMSIsIlVzZXJUeXBlIjoiMCIsIlVzZXJOYW1lMiI6InB5YWVzb25lNXBzcEB5YWhvby5jb20iLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.C-FbAazz7HkLeQ5L5eISGHGJCdwarGdz4A3v9XyvqCE',
-        'content-type': 'application/json;charset=UTF-8',
-    }
-    json_data = {
-        'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
-        'random': 'e431a6544cde4cbb8e09a4c01199b75b',
-        'signature': '1668945A145F050B049ED587E6E9E0E7', 'timestamp': 1000000000,
-    }
+    site = active_sessions.get(user_tg_id, {}).get("site", "777BIGWIN")
+
+    if site == "6Lottery":
+        url = 'https://6lotteryapi.com/api/webapi/GetNoaverageEmerdList'
+        headers = {
+            'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNzQ3OTQ1IiwibmJmIjoiMTc4Mzc0Nzk0NSIsImV4cCI6IjE3ODM3NDk3NDUiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzExLzIwMjYgMTI6MzI6MjUgUE0iLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL3JvbGUiOiJBY2Nlc3NfVG9rZW4iLCJVc2VySWQiOiIxMDc2NTk0IiwiVXNlck5hbWUiOiI5NTk2NzUzMjM4NzgiLCJVc2VyUGhvdG8iOiI3IiwiTmlja05hbWUiOiLhgJXhgLzhgIrhgLfhgLrhgIXhgK_hgLYiLCJBbW91bnQiOiI2ODIuMDAiLCJJbnRlZ3JhbCI6IjAiLCJMb2dpbk1hcmsiOiJINSIsIkxvZ2luVGltZSI6IjcvMTEvMjAyNiAxMjowMjoyNSBQTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6IjEzMCIsIlRva2VuVHlwZSI6IkFjY2Vzc19Ub2tlbiIsIlBob25lVHlwZSI6IjEiLCJVc2VyVHlwZSI6IjAiLCJVc2VyTmFtZTIiOiIiLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.LcFWlrh3lOnhgdztdqGJv0idysPzMbzk5yHaW_mRPZA',
+            'content-type': 'application/json;charset=UTF-8',
+        }
+        json_data = {
+            'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+            'random': 'f8e6fe62969046bf875bd73756a0d058',
+            'signature': 'E156CA0133F342D84E376535EEE5CDD9', 'timestamp': 1783748130,
+        }
+    else:
+        url = 'https://api.bigwinqaz.com/api/webapi/GetNoaverageEmerdList'
+        headers = {
+            'authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOiIxNzgzNjQzMjUwIiwibmJmIjoiMTc4MzY0MzI1MCIsImV4cCI6IjE3ODM2NDUwNTAiLCJodHRwOi8vc2NoZW1hcy5taWNyb3NvZnQuY29tL3dzLzIwMDgvMDYvaWRlbnRpdHkvY2xhaW1zL2V4cGlyYXRpb24iOiI3LzEwLzIwMjYgNzoyNzozMCBBTSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6IkFjY2Vzc19Ub2tlbiIsIlVzZXJJZCI6IjU3NDMzNSIsIlVzZXJOYW1lIjoiOTU5Njc1MzIzODc4IiwiVXNlclBob3RvIjoiNyIsIk5pY2tOYW1lIjoiV2FuZyBMaW4iLCJBbW91bnQiOiIxMDAwLjAwIiwiSW50ZWdyYWwiOiIwIiwiTG9naW5NYXJrIjoiSDUiLCJMb2dpblRpbWUiOiI3LzEwLzIwMjYgNjo1NzozMCBBTSIsIkxvZ2luSVBBZGRyZXNzIjoiMTAzLjEzNC4yMDcuMTUyIiwiRGJOdW1iZXIiOiIwIiwiSXN2YWxpZGF0b3IiOiIwIiwiS2V5Q29kZSI6Ijk3IiwiVG9rZW5UeXBlIjoiQWNjZXNzX1Rva2VuIiwiUGhvbmVUeXBlIjoiMSIsIlVzZXJUeXBlIjoiMCIsIlVzZXJOYW1lMiI6InB5YWVzb25lNXBzcEB5YWhvby5jb20iLCJpc3MiOiJqd3RJc3N1ZXIiLCJhdWQiOiJsb3R0ZXJ5VGlja2V0In0.C-FbAazz7HkLeQ5L5eISGHGJCdwarGdz4A3v9XyvqCE',
+            'content-type': 'application/json;charset=UTF-8',
+        }
+        json_data = {
+            'pageSize': 10, 'pageNo': 1, 'typeId': 30, 'language': 7,
+            'random': 'e431a6544cde4cbb8e09a4c01199b75b',
+            'signature': '1668945A145F050B049ED587E6E9E0E7', 'timestamp': 1000000000,
+        }
 
     try:
         async with aiohttp.ClientSession() as session:
@@ -704,7 +748,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                         for _ in range(20):
                             if not active_sessions.get(user_tg_id, {}).get("is_auto_betting", False): break
                             await asyncio.sleep(2)
-                            actual_result = await get_latest_game_result(current_issue)
+                            actual_result = await get_latest_game_result(current_issue, user_tg_id)
                             if actual_result != "? | ?": break
                                 
                         try:
@@ -770,7 +814,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                                 break 
                                 
                             await asyncio.sleep(2)
-                            actual_result = await get_latest_game_result(current_issue)
+                            actual_result = await get_latest_game_result(current_issue, user_tg_id)
                             if actual_result != "? | ?":
                                 break 
                         
@@ -936,6 +980,7 @@ async def btn_status(message: types.Message, state: FSMContext):
     session = active_sessions[user_tg_id]
     is_auto = "Running 🟢" if session.get("is_auto_betting", False) else "Stopped 🔴"
     ai_mode = session.get("ai_mode", "🎯 Pattern AI")
+    site_name = session.get("site", "777BIGWIN")
     
     current_seq = session.get("bet_sequence", [10])
     seq_str = "-".join(map(str, current_seq))
@@ -961,6 +1006,7 @@ async def btn_status(message: types.Message, state: FSMContext):
     status_text = (
         "📊 <b>Bot Status</b>\n"
         "━━━━━━━━━━━━━━━\n"
+        f"🌐 <b>Active Site:</b> {site_name}\n"
         f"🤖 <b>Auto-Bet State:</b> {is_auto}\n"
         f"🧠 <b>Active AI Mode:</b> {ai_mode}\n"
         f"💰 <b>Current Balance:</b> {current_bal_str}\n"
@@ -1005,10 +1051,12 @@ async def show_info(message: types.Message, state: FSMContext):
     username = data.get('username', 'N/A')
     nickname = data.get('nickname', 'Unknown')
     balance = data.get('balance', '0.00 Ks')
+    site_name = active_sessions.get(message.from_user.id, {}).get("site", "Unknown")
     login_time = data.get('login_time', datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
     info_text = (
         "👤 <b>User Information:</b>\n"
+        f"├─ 🌐 <b>Site:</b> {site_name}\n"
         f"├─ 🆔 <b>User ID:</b> {user_id}\n"
         f"├─ 📱 <b>Username:</b> {username}\n"
         f"├─ 🏷️ <b>Nickname:</b> {nickname}\n"
@@ -1026,21 +1074,21 @@ async def logout(message: types.Message, state: FSMContext):
         active_sessions[user_tg_id]["is_ai_prediction_enabled"] = False 
         
         page = active_sessions[user_tg_id].get("page")
+        site = active_sessions[user_tg_id].get("site", "777BIGWIN")
         
         if page:
             try:
-                # ၁။ Profile (ကျွန်ုပ်) စာမျက်နှာသို့ အရင်သွားရန်
-                # (မှတ်ချက် - ဂိမ်းထဲရောက်နေပါက လော့အောက်ခလုတ် မမြင်ရနိုင်သောကြောင့်ဖြစ်သည်)
-                await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
+                if site == "6Lottery":
+                    await page.goto("https://www.6win584.com/#/main", wait_until="networkidle")
+                else:
+                    await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
                 await page.wait_for_timeout(2000)
 
-                # ၂။ ပုံထဲက 'လော့အောက်' ခလုတ်ကို ရှာ၍နှိပ်ရန်
                 logout_btn = page.locator("div, button, span").filter(has_text="လော့အောက်").first
                 if await logout_btn.is_visible(timeout=3000):
                     await logout_btn.click()
-                    await page.wait_for_timeout(1000) # Dialog Box ထွက်လာရန် ခဏစောင့်မည်
+                    await page.wait_for_timeout(1000) 
 
-                # ၃။ အရင်ပုံထဲက 'အတည်ပြုပါ' ခလုတ်ကို ဆက်နှိပ်ရန်
                 confirm_btn = page.locator("div.dialog__container-footer button", has_text="အတည်ပြုပါ").first
                 if await confirm_btn.is_visible(timeout=3000):
                     await confirm_btn.click()
