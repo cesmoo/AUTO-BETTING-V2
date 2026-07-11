@@ -68,6 +68,9 @@ def parse_duration(duration_str: str):
         return timedelta(days=int(duration_str[:-1]))
     return None
 
+def get_myanmar_time() -> datetime:
+    """Server Time အစား Myanmar Time (UTC+6:30) အတိအကျကို ယူရန်"""
+    return datetime.utcnow() + timedelta(hours=6, minutes=30)
 
 # ==========================================================
 # 🛡️ Auth Middleware (သုံးခွင့်ရှိ/မရှိ စစ်ဆေးရေးဂိတ်)
@@ -97,7 +100,7 @@ class AuthMiddleware(BaseMiddleware):
             
             if expire_iso:
                 expire_time = datetime.fromisoformat(expire_iso)
-                if datetime.now() < expire_time:
+                if get_myanmar_time() < expire_time:
                     is_authorized = True
             
             if not is_authorized:
@@ -218,7 +221,7 @@ async def cmd_generate_key(message: types.Message):
     if not parse_duration(duration):
         return await message.answer("⚠️ အချိန်သတ်မှတ်ချက် မှားနေပါသည်။\nဂဏန်းနောက်တွင် H (နာရီ) သို့မဟုတ် D (ရက်) ထည့်ပါ။\nဥပမာ: <code>2H</code>, <code>5D</code>, <code>15D</code>")
     
-    date_prefix = datetime.now().strftime("%Y%m%d")
+    date_prefix = get_myanmar_time().strftime("%Y%m%d")
     random_str = ''.join(random.choices(string.ascii_uppercase, k=8))
     key_str = f"{date_prefix}{random_str}"
     
@@ -246,30 +249,7 @@ async def cmd_add_user(message: types.Message):
     if not td: 
         return await message.answer("⚠️ Duration မှားနေပါသည်။ (ဂဏန်းနောက်တွင် H သို့မဟုတ် D ထည့်ပါ။ ဥပမာ: 2H, 5D)")
     
-    new_expire = datetime.now() + td
-    await db.update_user_subscription(int(target_id), new_expire.isoformat())
-    
-    await message.answer(f"✅ User ID: <code>{target_id}</code> ကို <b>{duration}</b> စာ အသုံးပြုခွင့် ပေးလိုက်ပါပြီ။\nကုန်ဆုံးမည့်အချိန်: {new_expire.strftime('%Y-%m-%d %I:%M %p')}")
-
-
-@dp.message(F.text.startswith(".add "))
-async def cmd_add_user(message: types.Message):
-    if message.from_user.id != OWNER_ID: return
-    
-    parts = message.text.split(" ")
-    if len(parts) < 3:
-        return await message.answer("⚠️ Format မှားနေပါသည်။\nအသုံးပြုရန်: <code>.add [Telegram_ID] [Duration]</code>")
-        
-    target_id = parts[1].strip()
-    duration = parts[2].strip().upper()
-    
-    if duration == "1H": td = timedelta(hours=1)
-    elif duration == "1D": td = timedelta(days=1)
-    elif duration == "7D": td = timedelta(days=7)
-    elif duration == "30D": td = timedelta(days=30)
-    else: return await message.answer("⚠️ Duration မှားနေပါသည်။ (1H, 1D, 7D, 30D သာရမည်)")
-    
-    new_expire = datetime.now() + td
+    new_expire = get_myanmar_time() + td
     await db.update_user_subscription(int(target_id), new_expire.isoformat())
     
     await message.answer(f"✅ User ID: <code>{target_id}</code> ကို <b>{duration}</b> စာ အသုံးပြုခွင့် ပေးလိုက်ပါပြီ။\nကုန်ဆုံးမည့်အချိန်: {new_expire.strftime('%Y-%m-%d %I:%M %p')}")
@@ -285,15 +265,15 @@ async def process_key_redemption(message: types.Message):
     if key_data:
         duration = key_data["duration"]
         td = parse_duration(duration)
-        if not td: td = timedelta(days=1) # Fallback အနေဖြင့် 1 ရက်ထားမည်
+        if not td: td = timedelta(days=1)
         
         user_id = message.from_user.id
-        current_expire = datetime.now()
+        current_expire = get_myanmar_time()
         
         existing_expire_iso = await db.get_user_subscription(user_id)
         if existing_expire_iso:
             old_expire = datetime.fromisoformat(existing_expire_iso)
-            if old_expire > datetime.now():
+            if old_expire > get_myanmar_time():
                 current_expire = old_expire
                 
         new_expire = current_expire + td
@@ -302,13 +282,11 @@ async def process_key_redemption(message: types.Message):
         
         await message.answer(
             f"🎉 <b>အသုံးပြုခွင့် အောင်မြင်စွာ ရရှိပါပြီ!</b>\n\n"
-            f"သင်သည် ဤ Bot ကို <b>{new_expire.strftime('%Y-%m-%d %I:%M %p')}</b> အထိ အသုံးပြုနိုင်ပါပြီ။\n"
+            f"သင်သည် ဤ Bot ကို <b>{new_expire.strftime('%Y-%m-%d %I:%M %p')}</b> (MMT) အထိ အသုံးပြုနိုင်ပါပြီ။\n"
             f"စတင်ကစားရန် /start ကို နှိပ်ပါ။"
         )
     else:
         await message.answer("❌ <b>Key မှားယွင်းနေပါသည် (သို့) အသုံးပြုပြီးသား ဖြစ်နေပါသည်။</b>")
-
-
 
 # ==========================================================
 # 🤖 Standard Bot Handlers
@@ -336,7 +314,7 @@ async def process_site(message: types.Message, state: FSMContext):
 async def process_phone(message: types.Message, state: FSMContext):
     await state.update_data(phone=message.text)
     await state.set_state(LoginForm.enter_password)
-    await message.answer("ᴘʟᴇᴀꜱᴇ ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘᴀꜱꜱᴡᴏʀᴅ", reply_markup=ReplyKeyboardRemove())
+    await message.answer("ᴘʟᴇᴀꜱᴇ ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘᴀꜱ মিলিটারি", reply_markup=ReplyKeyboardRemove())
 
 # ==========================================================
 # 🔥 Playwright Logic: Login & Database Save
@@ -413,7 +391,7 @@ async def process_password(message: types.Message, state: FSMContext):
             except: pass
 
             user_id, nickname, balance_text = "N/A", "Unknown", "0.00 Ks"
-            site_login_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            site_login_time = get_myanmar_time().strftime("%Y-%m-%d %H:%M:%S")
 
             try:
                 nick_el = page.locator('.userInfo__container-content-nickname h3').first
@@ -451,7 +429,8 @@ async def process_password(message: types.Message, state: FSMContext):
                 "bet_sequence": [10],           
                 "current_bet_step": 0,          
                 "profit_target": 0,             
-                "start_balance": 0.0,
+                "start_balance": extract_balance(balance_text),
+                "session_profit": 0.0, # 👈 Profit အတိအကျမှတ်ရန်
                 "hit_wait": 0,
                 "current_misses": 0,
                 "is_ai_prediction_enabled": False, 
@@ -666,7 +645,7 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
         return False
 
 # ==========================================================
-# 📊 Get Actual Game Result from API
+# 📊 API Fetching
 # ==========================================================
 async def get_latest_game_result(target_issue, user_tg_id):
     site = active_sessions.get(user_tg_id, {}).get("site", "777BIGWIN")
@@ -709,10 +688,6 @@ async def get_latest_game_result(target_issue, user_tg_id):
     except: pass
     return "? | ?"
 
-
-# ==========================================================
-# 🧠 AI Prediction API Fetching Logic
-# ==========================================================
 async def get_ai_prediction(user_tg_id):
     site = active_sessions.get(user_tg_id, {}).get("site", "777BIGWIN")
 
@@ -773,7 +748,9 @@ async def get_ai_prediction(user_tg_id):
         print(f"API Fetching Error: {e}")
         return None, 0, None, None
 
-
+# ==========================================================
+# 🔄 Continuous Auto Bet Loop Task 
+# ==========================================================
 async def auto_bet_loop(user_tg_id, message: types.Message):
     await message.answer("🚀 Auto-Betting စတင်ပါပြီ! ရပ်တန့်ရန် 🛑 Stop Auto-Bet ကို နှိပ်ပါ။")
     last_betted_issue = None
@@ -807,16 +784,16 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                             if predicted_bet.lower() == actual_size:
                                 active_sessions[user_tg_id]["current_misses"] = 0 
                                 await msg.edit_text(f"🔄 <b>Hit Reset:</b> AI အမှန်ခန့်မှန်းသွားသဖြင့် အစမှပြန်စောင့်ပါမည်။\nResult: {actual_result}")
-                                asyncio.create_task(delete_message_later(msg, 5)) # 👈 Auto Delete
+                                asyncio.create_task(delete_message_later(msg, 5)) 
                             elif actual_size != "?":
                                 active_sessions[user_tg_id]["current_misses"] += 1 
                                 new_miss = active_sessions[user_tg_id]["current_misses"]
                                 if new_miss >= hit_wait:
                                     await msg.edit_text(f"🎯 <b>Target Reached!</b> {hit_wait} ပွဲဆက်တိုက်လွဲသွားသဖြင့် နောက်ပွဲမှစတင်လောင်းပါမည်။\nResult: {actual_result}")
-                                    asyncio.create_task(delete_message_later(msg, 5)) # 👈 Auto Delete
+                                    asyncio.create_task(delete_message_later(msg, 5)) 
                                 else:
                                     await msg.edit_text(f"❌ <b>Virtual Loss:</b> {new_miss}/{hit_wait} ပွဲလွဲသွားပါပြီ။\nResult: {actual_result}")
-                                    asyncio.create_task(delete_message_later(msg, 5)) # 👈 Auto Delete
+                                    asyncio.create_task(delete_message_later(msg, 5)) 
                             last_betted_issue = current_issue
                         except: pass
                         await asyncio.sleep(2)
@@ -854,36 +831,41 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                             if actual_result != "? | ?": break 
                         
                         balance_after_str = "0"
-                        new_bal_val = 0.0
                         try:
                             bal_el = page.locator('.Wallet__C-balance-l1 div').first
                             if await bal_el.is_visible(timeout=2000):
                                 balance_after_str = await bal_el.inner_text()
-                                new_bal_val = extract_balance(balance_after_str)
                         except: pass
 
                         try:
                             actual_size = actual_result.split(" | ")[1].strip().lower() 
-                            if predicted_bet.lower() == actual_size:
-                                status_title = f"✅ <b>WIN +{current_amount * 0.96:.2f} Ks</b>"
+                            predicted_size = predicted_bet.lower()
+                            
+                            # 👈 Profit အတိအကျ တွက်ချက်ခြင်း (Internal Tracking)
+                            if predicted_size == actual_size:
+                                profit_amount = current_amount * 0.96
+                                status_title = f"✅ <b>WIN +{profit_amount:.2f} Ks</b>"
+                                active_sessions[user_tg_id]["session_profit"] += profit_amount
                                 active_sessions[user_tg_id]["current_bet_step"] = 0 
                                 active_sessions[user_tg_id]["current_misses"] = 0 
-                            elif actual_size == "?": status_title = f"⚖️ <b>DRAW (Pending)</b>"
+                            elif actual_size == "?": 
+                                status_title = f"⚖️ <b>DRAW (Pending)</b>"
                             else:
                                 status_title = f"❌ <b>LOSE -{current_amount:.2f} Ks</b>"
+                                active_sessions[user_tg_id]["session_profit"] -= current_amount
                                 active_sessions[user_tg_id]["current_bet_step"] += 1
-                                if active_sessions[user_tg_id]["current_bet_step"] >= len(sequence): active_sessions[user_tg_id]["current_bet_step"] = 0
+                                if active_sessions[user_tg_id]["current_bet_step"] >= len(sequence): 
+                                    active_sessions[user_tg_id]["current_bet_step"] = 0
                                 
-                            start_bal = active_sessions[user_tg_id].get("start_balance", new_bal_val)
-                            profit_target = active_sessions[user_tg_id].get("profit_target", 0)
-                            current_profit = new_bal_val - start_bal
+                            current_profit = active_sessions[user_tg_id].get("session_profit", 0.0)
                             profit_display = f"+{current_profit:,.2f} Ks" if current_profit > 0 else f"{current_profit:,.2f} Ks"
                             
-                            await message.answer(f"{status_title}\n━━━━━━━━━━━━━━━\n• Result : {actual_result}\n• Balance : {balance_after_str}\n• Profit : {profit_display}")
+                            await message.answer(f"{status_title}\n━━━━━━━━━━━━━━━\n• Result : {actual_result}\n• Balance : {balance_after_str}\n• Total Profit : {profit_display}")
                             await db.update_user_balance(user_tg_id, balance_after_str.strip())
                             
+                            profit_target = active_sessions[user_tg_id].get("profit_target", 0)
                             if profit_target > 0 and current_profit >= profit_target:
-                                await message.answer(f"🎉 <b>Target ပြည့်သွားပါပြီ! (+{current_profit:g} Ks)</b>")
+                                await message.answer(f"🎉 <b>Target ပြည့်သွားပါပြီ! ({profit_display})</b>\nသတ်မှတ်ထားသော အမြတ် {profit_target} Ks သို့ ရောက်ရှိသွားသဖြင့် Auto Bet ကို အလိုအလျောက် ရပ်နားလိုက်ပါသည်။")
                                 active_sessions[user_tg_id]["is_auto_betting"] = False
                                 break
                         except: pass
@@ -894,33 +876,6 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                 if api_error_count == 3: await message.answer("⚠️ <b>API အမှားအယွင်း:</b> ပွဲစဉ်အချက်အလက်များကို ယူ၍မရပါ။")
                 await asyncio.sleep(5) 
         except: await asyncio.sleep(5)
-
-# ==========================================================
-# ⚙️ Set Bet-Size Handlers
-# ==========================================================
-@dp.message(F.text == "⚙️ Set Bet-Size")
-async def btn_set_betsize(message: types.Message, state: FSMContext):
-    user_tg_id = message.from_user.id
-    if user_tg_id not in active_sessions: return await message.answer("⚠️ အရင်ဆုံး Login ဝင်ပေးပါ။")
-    current_seq = active_sessions[user_tg_id].get("bet_sequence", [10])
-    await state.set_state(LoginForm.enter_bet_sequence)
-    await message.answer(f"⚙️ <b>Auto Bet လောင်းကြေး (Bet Size) ကို သတ်မှတ်ပါ။</b>\n\nလက်ရှိ သတ်မှတ်ထားသော ပမာဏ: <code>{'-'.join(map(str, current_seq))}</code>", reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Cancel")]], resize_keyboard=True))
-
-@dp.message(LoginForm.enter_bet_sequence)
-async def process_bet_sequence(message: types.Message, state: FSMContext):
-    user_tg_id = message.from_user.id
-    text = message.text.strip()
-    if text.lower() == 'cancel':
-        await state.set_state(LoginForm.main_menu)
-        return await message.answer("❌ မပြောင်းလဲတော့ပါ။", reply_markup=get_logged_in_keyboard())
-    try:
-        sequence = [int(x.strip()) for x in text.split('-')]
-        if len(sequence) == 0 or any(x <= 0 for x in sequence): raise ValueError
-        active_sessions[user_tg_id]["bet_sequence"] = sequence
-        active_sessions[user_tg_id]["current_bet_step"] = 0 
-        await state.set_state(LoginForm.main_menu)
-        await message.answer(f"✅ <b>Bet Size အောင်မြင်စွာ သတ်မှတ်ပြီးပါပြီ:</b> <code>{'-'.join(map(str, sequence))}</code>", reply_markup=get_logged_in_keyboard())
-    except: await message.answer("❌ မှားယွင်းနေပါသည်။ ဥပမာ: 10-20-40-80 ဟုသာ ဂဏန်းများကို တုံးတို (-) ခြား၍ ရိုက်ထည့်ပါ။")
 
 # ==========================================================
 # 🤖 Reply Keyboard Auto Bet & Status Handlers
@@ -938,7 +893,8 @@ async def btn_start_auto(message: types.Message, state: FSMContext):
     try:
         page = active_sessions[user_tg_id]["page"]
         bal_el = page.locator('.Wallet__C-balance-l1 div').first
-        if await bal_el.is_visible(timeout=3000): active_sessions[user_tg_id]["start_balance"] = extract_balance(await bal_el.inner_text())
+        if await bal_el.is_visible(timeout=3000): 
+            active_sessions[user_tg_id]["start_balance"] = extract_balance(await bal_el.inner_text())
     except: active_sessions[user_tg_id]["start_balance"] = 0.0
 
     active_sessions[user_tg_id]["is_auto_betting"] = True
@@ -963,8 +919,8 @@ async def btn_status(message: types.Message, state: FSMContext):
         if await bal_el.is_visible(timeout=2000): current_bal_str = await bal_el.inner_text()
     except: pass
     
-    start_bal = session.get("start_balance", 0.0)
-    current_profit = extract_balance(current_bal_str) - start_bal
+    current_profit = session.get("session_profit", 0.0)
+    profit_str = f"+{current_profit:g} Ks" if current_profit >= 0 else f"{current_profit:g} Ks"
     seq = session.get("bet_sequence", [10])
     step = session.get("current_bet_step", 0)
 
@@ -975,7 +931,7 @@ async def btn_status(message: types.Message, state: FSMContext):
         f"💰 <b>Current Balance:</b> {current_bal_str}\n"
         f"⚙️ <b>Bet Sequence:</b> <code>{'-'.join(map(str, seq))}</code>\n"
         f"📍 <b>Current Step:</b> {step + 1}/{len(seq)} ({seq[step]} Ks)\n"
-        f"📈 <b>Current Profit:</b> {'+' if current_profit >= 0 else ''}{current_profit:g} Ks\n"
+        f"📈 <b>Total Profit:</b> {profit_str}\n"
     )
 
 # ==========================================================
@@ -1010,8 +966,8 @@ async def show_info(message: types.Message, state: FSMContext):
         f"├─ 🆔 <b>User ID:</b> {data.get('user_id', 'N/A')}\n"
         f"├─ 📱 <b>Username:</b> {data.get('username', 'N/A')}\n"
         f"├─ 💰 <b>Balance:</b> {data.get('balance', '0.00 Ks')}\n"
-        f"├─ 📅 <b>Login Date:</b> {data.get('login_time', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}\n"
-        f"└─ 🔑 <b>Expire On:</b> {expire_str}\n"
+        f"├─ 📅 <b>Login Date:</b> {data.get('login_time', get_myanmar_time().strftime('%Y-%m-%d %H:%M:%S'))}\n"
+        f"└─ 🔑 <b>Expire On:</b> {expire_str} (MMT)\n"
     )
     await message.answer(info_text, reply_markup=get_logged_in_keyboard())
 
