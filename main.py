@@ -110,12 +110,10 @@ class AuthMiddleware(BaseMiddleware):
             if not is_authorized:
                 if isinstance(event, types.Message):
                     await event.answer(
-                        "⚠️ <b>အသုံးပြုခွင့် မရှိပါ။</b>\n\n"
-                        "သင်သည် ဤ Bot ကို အသုံးပြုခွင့် (Subscription) မရှိသေးပါ (သို့) သက်တမ်းကုန်ဆုံးသွားပါပြီ။\n"
-                        "အသုံးပြုခွင့် Key ကို Owner ထံမှ ဝယ်ယူပြီး ဤနေရာတွင် Paste ချ၍ ပေးပို့ပါ။"
+                        "ᴄᴏɴᴛᴀᴄᴛ ᴜꜱ @iwillgoforwardsalone "
                     )
                 elif isinstance(event, types.CallbackQuery):
-                    await event.answer("⚠️ အသုံးပြုခွင့် သက်တမ်းကုန်သွားပါပြီ။", show_alert=True)
+                    await event.answer("အသုံးပြုခွင့် သက်တမ်းကုန်သွားပါပြီ။", show_alert=True)
                 return 
         
         return await handler(event, data)
@@ -173,7 +171,7 @@ def get_main_keyboard():
 def get_site_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="777BIGWIN"), KeyboardButton(text="6Lottery")], 
+            [KeyboardButton(text="𝟳𝟳𝟳𝗕𝗜𝗚𝗪𝗜𝗡"), KeyboardButton(text="𝗦𝗜𝗫 𝗟𝗢𝗧𝗧𝗘𝗥𝗬")], 
             [KeyboardButton(text="🔙 နောက်သို့")]
         ],
         resize_keyboard=True
@@ -321,12 +319,12 @@ async def process_key_redemption(message: types.Message):
         await db.delete_key(key_str)
         
         await message.answer(
-            f"🎉 <b>အသုံးပြုခွင့် အောင်မြင်စွာ ရရှိပါပြီ!</b>\n\n"
-            f"သင်သည် ဤ Bot ကို <b>{new_expire.strftime('%Y-%m-%d %I:%M %p')}</b> (MMT) အထိ အသုံးပြုနိုင်ပါပြီ။\n"
-            f"စတင်ကစားရန် /start ကို နှိပ်ပါ။"
+            f"ʟɪᴄᴇɴꜱᴇ ᴋᴇʏ ᴀᴄᴛɪᴠᴇ\n"
+            f"ᴇxᴘɪʀᴇ ᴛɪᴍᴇ <b>{new_expire.strftime('%Y-%m-%d %I:%M %p')}</b> (MMT) \n"
+            f"ᴄʟɪᴄᴋ /start ᴛᴏ ᴘʟᴀʏ."
         )
     else:
-        await message.answer("❌ <b>Key မှားယွင်းနေပါသည် (သို့) အသုံးပြုပြီးသား ဖြစ်နေပါသည်။</b>")
+        await message.answer("ɪɴᴄᴏʀʀᴇᴄᴛ ᴋᴇʏ ᴏʀ ᴋᴇʏ ɪꜱ ᴇxᴘɪʀᴇᴅ.")
 
 # ==========================================================
 # 🤖 Standard Bot Handlers
@@ -495,7 +493,7 @@ async def process_password(message: types.Message, state: FSMContext):
                 "last_predicted_issue": None       
             }
 
-            await message.answer(f"𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦 ({site_name})", reply_markup=get_logged_in_keyboard())
+            await message.answer(f"𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦", reply_markup=get_logged_in_keyboard())
             await state.set_state(LoginForm.main_menu)
             
         else:
@@ -552,6 +550,12 @@ async def process_toggle_aipred(callback: types.CallbackQuery):
 
 async def prediction_broadcast_loop(user_tg_id, message: types.Message):
     api_error_count = 0
+    
+    # Win / Lose Streak များကို အစပြုရန် (မရှိသေးပါက)
+    if "pred_win_streak" not in active_sessions.get(user_tg_id, {}):
+        active_sessions[user_tg_id]["pred_win_streak"] = 0
+        active_sessions[user_tg_id]["pred_lose_streak"] = 0
+
     while active_sessions.get(user_tg_id, {}).get("is_ai_prediction_enabled", False):
         try:
             predicted_bet, confidence, current_issue, ai_name = await get_ai_prediction(user_tg_id)
@@ -562,11 +566,15 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                 if current_issue != last_issue:
                     active_sessions[user_tg_id]["last_predicted_issue"] = current_issue
                     
+                    # လက်ရှိ Streak များကို ယူရန်
+                    w_streak = active_sessions[user_tg_id].get("pred_win_streak", 0)
+                    l_streak = active_sessions[user_tg_id].get("pred_lose_streak", 0)
+                    
                     pred_msg = await message.answer(
                         f"🔮 <b>AI Prediction (Live)</b>\n"
                         f"━━━━━━━━━━━━━━━\n"
                         f"• WINGO_30S : <code>{current_issue}</code>\n"
-                        f"• Prediction : <b>{predicted_bet.upper()}</b>\n"
+                        f"• Prediction : <b>{predicted_bet.upper()}</b>〔 {w_streak} 〕|〔 {l_streak} 〕\n"
                         f"• Status : ⏳ <b>Waiting for result...</b>"
                     )
                     
@@ -583,17 +591,25 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                         actual_size = actual_result.split(" | ")[1].strip().lower()
                         if predicted_bet.lower() == actual_size:
                             status_text = f"✅ <b>WIN ({actual_result})</b>"
+                            active_sessions[user_tg_id]["pred_win_streak"] += 1
+                            active_sessions[user_tg_id]["pred_lose_streak"] = 0 # နိုင်သွားရင် Lose Streak ကို 0 ပြန်ထားမည်
                         else:
                             status_text = f"❌ <b>LOSE ({actual_result})</b>"
+                            active_sessions[user_tg_id]["pred_lose_streak"] += 1
+                            active_sessions[user_tg_id]["pred_win_streak"] = 0 # ရှုံးသွားရင် Win Streak ကို 0 ပြန်ထားမည်
                     else:
                         status_text = "⚖️ <b>DRAW (Timeout)</b>"
+                        
+                    # ရလဒ်ထွက်ပြီးနောက် Update ဖြစ်သွားသော Streak များကို ပြန်ယူရန်
+                    new_w_streak = active_sessions[user_tg_id].get("pred_win_streak", 0)
+                    new_l_streak = active_sessions[user_tg_id].get("pred_lose_streak", 0)
                         
                     try:
                         await pred_msg.edit_text(
                             f"🔮 <b>AI Prediction (Live)</b>\n"
                             f"━━━━━━━━━━━━━━━\n"
                             f"• WINGO_30S : <code>{current_issue}</code>\n"
-                            f"• Prediction : <b>{predicted_bet.upper()}</b>\n"
+                            f"• Prediction : <b>{predicted_bet.upper()}</b>〔 {new_w_streak} 〕|〔 {new_l_streak} 〕\n"
                             f"• Status : {status_text}"
                         )
                     except Exception: 
@@ -610,6 +626,7 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                 
         except Exception: 
             await asyncio.sleep(5)
+
 
 # ==========================================================
 # 🎯 Feature Handlers (Hit, Profit, AI Mode)
