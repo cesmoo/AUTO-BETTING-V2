@@ -1024,6 +1024,32 @@ async def logout(message: types.Message, state: FSMContext):
     if user_tg_id in active_sessions:
         active_sessions[user_tg_id]["is_auto_betting"] = False 
         active_sessions[user_tg_id]["is_ai_prediction_enabled"] = False 
+        
+        page = active_sessions[user_tg_id].get("page")
+        
+        if page:
+            try:
+                # ၁။ Profile (ကျွန်ုပ်) စာမျက်နှာသို့ အရင်သွားရန်
+                # (မှတ်ချက် - ဂိမ်းထဲရောက်နေပါက လော့အောက်ခလုတ် မမြင်ရနိုင်သောကြောင့်ဖြစ်သည်)
+                await page.goto("https://www.777bigwingame.app/#/main", wait_until="networkidle")
+                await page.wait_for_timeout(2000)
+
+                # ၂။ ပုံထဲက 'လော့အောက်' ခလုတ်ကို ရှာ၍နှိပ်ရန်
+                logout_btn = page.locator("div, button, span").filter(has_text="လော့အောက်").first
+                if await logout_btn.is_visible(timeout=3000):
+                    await logout_btn.click()
+                    await page.wait_for_timeout(1000) # Dialog Box ထွက်လာရန် ခဏစောင့်မည်
+
+                # ၃။ အရင်ပုံထဲက 'အတည်ပြုပါ' ခလုတ်ကို ဆက်နှိပ်ရန်
+                confirm_btn = page.locator("div.dialog__container-footer button", has_text="အတည်ပြုပါ").first
+                if await confirm_btn.is_visible(timeout=3000):
+                    await confirm_btn.click()
+                    await page.wait_for_timeout(2000)
+                    
+            except Exception as e:
+                print(f"Logout UI Click Error: {e}")
+
+        # Browser များကို ပိတ်ခြင်း
         try:
             await active_sessions[user_tg_id]["browser"].close()
             await active_sessions[user_tg_id]["playwright"].stop()
@@ -1032,6 +1058,7 @@ async def logout(message: types.Message, state: FSMContext):
         
     await state.clear()
     await message.answer("👋 အကောင့်ထွက်ပြီးပါပြီ။", reply_markup=get_main_keyboard())
+
 
 @dp.message(F.text == "🎰 Games")
 async def games(message: types.Message):
