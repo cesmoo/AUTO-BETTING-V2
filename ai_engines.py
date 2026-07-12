@@ -1,3 +1,5 @@
+[file name]: ai_engines.py
+[file content begin]
 # ai_engines.py
 import numpy as np
 import time
@@ -31,29 +33,6 @@ P_AI_CHART_DOWN = '<tg-emoji emoji-id="5884289942371401145">📉</tg-emoji>'
 P_AI_STAR = '<tg-emoji emoji-id="5807868868886009920">⭐</tg-emoji>'
 P_AI_ROBOT = '<tg-emoji emoji-id="5877652234091891383">🤖</tg-emoji>'
 P_AI_BRAIN = '<tg-emoji emoji-id="5868656545634689320">🧠</tg-emoji>'
-
-# ==========================================================
-# 🎨 AI Mode Emoji IDs for Reply Keyboard
-# ==========================================================
-AI_MODE_EMOJIS = {
-    "🎯 Pattern AI": "6114102463747332294",
-    "🎲 Martingale AI": "6113995669385515849",
-    "🔄 Anti-Martingale AI": "6210747139237088236",
-    "📊 Trend Following": "5431577498364158238",
-    "🔢 Fibonacci AI": "5884290437459480896",
-    "🎯 Golden Ratio": "6114102463747332294",
-    "📈 Momentum AI": "5269460053651366623",
-    "🎲 Monte Carlo": "6113995669385515849",
-    "🧬 Neural Pattern": "5212936673423274058",
-    "⚡ Quick Reversal": "6210787138267515780",
-    "🌊 Wave Analysis": "5431685735835011215",
-    "🎪 Chaos Theory": "6251379582851614396",
-    "🤖 Ensemble AI": "6300674206703027915",
-    "📐 Bayesian AI": "5366380461746563803",
-    "🔗 Markov Chain": "6210879046272682741",
-    "🧪 ML Style AI": "6190369920304289234",
-    "🎡 Circle Rnd": "5226711870492126219",
-}
 
 class AIEmoji:
     CHECK = "✅"; CROSS = "❌"; INFO = "ℹ️"; HOURGLASS = "⏳"
@@ -420,27 +399,146 @@ def circle_rnd_predict(history_docs):
     return predicted, f"{P_AI_STAR} {predicted} ({'အကြီး' if predicted == 'BIG' else 'အသေး'}) {emoji}", confidence, f"🎡 Circle Rnd: Spinner"
 
 # ========== AI MODES DICTIONARY ==========
+# ✅ AI Mode Names with Emojis (For Reply Keyboard)
+AI_MODE_NAMES = {
+    "pattern": "🎯 Pattern AI",
+    "martingale": "🎲 Martingale AI",
+    "anti_martingale": "🔄 Anti-Martingale AI",
+    "trend_following": "📊 Trend Following",
+    "fibonacci": "🔢 Fibonacci AI",
+    "golden_ratio": "🎯 Golden Ratio",
+    "momentum": "📈 Momentum AI",
+    "monte_carlo": "🎲 Monte Carlo",
+    "neural_pattern": "🧬 Neural Pattern",
+    "quick_reversal": "⚡ Quick Reversal",
+    "wave_analysis": "🌊 Wave Analysis",
+    "chaos_theory": "🎪 Chaos Theory",
+    "ensemble": "🤖 Ensemble AI",
+    "bayesian": "📐 Bayesian AI",
+    "markov_chain": "🔗 Markov Chain",
+    "ml_style": "🧪 ML Style AI",
+    "circle_rnd": "🎡 Circle Rnd",
+}
+
 AI_MODES = {
-    "pattern": {"func": pattern_predict, "name": "🎯 Pattern AI", "desc": "Pattern Auto-Switch"},
-    "martingale": {"func": martingale_predict, "name": "🎲 Martingale AI", "desc": "Contrarian Strategy"},
-    "anti_martingale": {"func": anti_martingale_predict, "name": "🔄 Anti-Martingale AI", "desc": "Trend Follow"},
-    "trend_following": {"func": trend_following_predict, "name": "📊 Trend Following", "desc": "MA Trend Analysis"},
-    "fibonacci": {"func": fibonacci_predict, "name": "🔢 Fibonacci AI", "desc": "Fib Retracement"},
-    "golden_ratio": {"func": golden_ratio_predict, "name": "🎯 Golden Ratio", "desc": "61.8% Rule"},
-    "momentum": {"func": momentum_predict, "name": "📈 Momentum AI", "desc": "Weighted Momentum"},
-    "monte_carlo": {"func": monte_carlo_predict, "name": "🎲 Monte Carlo", "desc": "1000x Simulation"},
-    "neural_pattern": {"func": neural_pattern_predict, "name": "🧬 Neural Pattern", "desc": "Pattern Similarity"},
-    "quick_reversal": {"func": quick_reversal_predict, "name": "⚡ Quick Reversal", "desc": "Alternation Detection"},
-    "wave_analysis": {"func": wave_analysis_predict, "name": "🌊 Wave Analysis", "desc": "Elliott Wave"},
-    "chaos_theory": {"func": chaos_theory_predict, "name": "🎪 Chaos Theory", "desc": "Entropy Analysis"},
-    "ensemble": {"func": ensemble_predict, "name": "🤖 Ensemble AI", "desc": "12 AI Voting System"},
-    "bayesian": {"func": bayesian_predict, "name": "📐 Bayesian AI", "desc": "Conditional Probability"},
-    "markov_chain": {"func": markov_chain_predict, "name": "🔗 Markov Chain", "desc": "Transition Matrix"},
-    "ml_style": {"func": ml_style_predict, "name": "🧪 ML Style AI", "desc": "Weighted Features"},
-    "circle_rnd": {"func": circle_rnd_predict, "name": "🎡 Circle Rnd", "desc": "Random Wheel Spin"},
+    "pattern": {"func": pattern_predict, "name": AI_MODE_NAMES["pattern"], "desc": "Pattern Auto-Switch"},
+    "martingale": {"func": martingale_predict, "name": AI_MODE_NAMES["martingale"], "desc": "Contrarian Strategy"},
+    "anti_martingale": {"func": anti_martingale_predict, "name": AI_MODE_NAMES["anti_martingale"], "desc": "Trend Follow"},
+    "trend_following": {"func": trend_following_predict, "name": AI_MODE_NAMES["trend_following"], "desc": "MA Trend Analysis"},
+    "fibonacci": {"func": fibonacci_predict, "name": AI_MODE_NAMES["fibonacci"], "desc": "Fib Retracement"},
+    "golden_ratio": {"func": golden_ratio_predict, "name": AI_MODE_NAMES["golden_ratio"], "desc": "61.8% Rule"},
+    "momentum": {"func": momentum_predict, "name": AI_MODE_NAMES["momentum"], "desc": "Weighted Momentum"},
+    "monte_carlo": {"func": monte_carlo_predict, "name": AI_MODE_NAMES["monte_carlo"], "desc": "1000x Simulation"},
+    "neural_pattern": {"func": neural_pattern_predict, "name": AI_MODE_NAMES["neural_pattern"], "desc": "Pattern Similarity"},
+    "quick_reversal": {"func": quick_reversal_predict, "name": AI_MODE_NAMES["quick_reversal"], "desc": "Alternation Detection"},
+    "wave_analysis": {"func": wave_analysis_predict, "name": AI_MODE_NAMES["wave_analysis"], "desc": "Elliott Wave"},
+    "chaos_theory": {"func": chaos_theory_predict, "name": AI_MODE_NAMES["chaos_theory"], "desc": "Entropy Analysis"},
+    "ensemble": {"func": ensemble_predict, "name": AI_MODE_NAMES["ensemble"], "desc": "12 AI Voting System"},
+    "bayesian": {"func": bayesian_predict, "name": AI_MODE_NAMES["bayesian"], "desc": "Conditional Probability"},
+    "markov_chain": {"func": markov_chain_predict, "name": AI_MODE_NAMES["markov_chain"], "desc": "Transition Matrix"},
+    "ml_style": {"func": ml_style_predict, "name": AI_MODE_NAMES["ml_style"], "desc": "Weighted Features"},
+    "circle_rnd": {"func": circle_rnd_predict, "name": AI_MODE_NAMES["circle_rnd"], "desc": "Random Wheel Spin"},
 }
 
 def get_prediction(history_docs, mode):
     mode_info = AI_MODES.get(mode)
     if mode_info: return mode_info["func"](history_docs)
     return AI_MODES["pattern"]["func"](history_docs)
+
+# ==========================================================
+# 🎨 AI Mode Emoji IDs for Reply Keyboard (xxx.py အတွက်)
+# ==========================================================
+from aiogram.types import KeyboardButton
+
+AI_MODE_BUTTONS = {
+    "pattern": KeyboardButton(
+        text=AI_MODE_NAMES["pattern"],
+        icon_custom_emoji_id="5868656545634689320",
+        style="primary"
+    ),
+    "martingale": KeyboardButton(
+        text=AI_MODE_NAMES["martingale"],
+        icon_custom_emoji_id="5868108575387671725",
+        style="primary"
+    ),
+    "anti_martingale": KeyboardButton(
+        text=AI_MODE_NAMES["anti_martingale"],
+        icon_custom_emoji_id="5868665489092263539",
+        style="primary"
+    ),
+    "trend_following": KeyboardButton(
+        text=AI_MODE_NAMES["trend_following"],
+        icon_custom_emoji_id="5877652234091891383",
+        style="primary"
+    ),
+    "fibonacci": KeyboardButton(
+        text=AI_MODE_NAMES["fibonacci"],
+        icon_custom_emoji_id="5877260593903177342",
+        style="primary"
+    ),
+    "golden_ratio": KeyboardButton(
+        text=AI_MODE_NAMES["golden_ratio"],
+        icon_custom_emoji_id="5869547610204280761",
+        style="primary"
+    ),
+    "momentum": KeyboardButton(
+        text=AI_MODE_NAMES["momentum"],
+        icon_custom_emoji_id="5884248697980608904",
+        style="primary"
+    ),
+    "monte_carlo": KeyboardButton(
+        text=AI_MODE_NAMES["monte_carlo"],
+        icon_custom_emoji_id="5884041323843955199",
+        style="primary"
+    ),
+    "neural_pattern": KeyboardButton(
+        text=AI_MODE_NAMES["neural_pattern"],
+        icon_custom_emoji_id="5875180111744995604",
+        style="primary"
+    ),
+    "quick_reversal": KeyboardButton(
+        text=AI_MODE_NAMES["quick_reversal"],
+        icon_custom_emoji_id="5890997763331591703",
+        style="primary"
+    ),
+    "wave_analysis": KeyboardButton(
+        text=AI_MODE_NAMES["wave_analysis"],
+        icon_custom_emoji_id="5967574255670399788",
+        style="primary"
+    ),
+    "chaos_theory": KeyboardButton(
+        text=AI_MODE_NAMES["chaos_theory"],
+        icon_custom_emoji_id="5877443460725739250",
+        style="primary"
+    ),
+    "ensemble": KeyboardButton(
+        text=AI_MODE_NAMES["ensemble"],
+        icon_custom_emoji_id="5877652234091891383",
+        style="primary"
+    ),
+    "bayesian": KeyboardButton(
+        text=AI_MODE_NAMES["bayesian"],
+        icon_custom_emoji_id="5868656545634689320",
+        style="primary"
+    ),
+    "markov_chain": KeyboardButton(
+        text=AI_MODE_NAMES["markov_chain"],
+        icon_custom_emoji_id="5848119413041431362",
+        style="primary"
+    ),
+    "ml_style": KeyboardButton(
+        text=AI_MODE_NAMES["ml_style"],
+        icon_custom_emoji_id="5884289942371401145",
+        style="primary"
+    ),
+    "circle_rnd": KeyboardButton(
+        text=AI_MODE_NAMES["circle_rnd"],
+        icon_custom_emoji_id="5807868868886009920",
+        style="primary"
+    ),
+}
+
+def get_ai_mode_buttons():
+    """Return list of all AI mode buttons for keyboard"""
+    return list(AI_MODE_BUTTONS.values())
+[file content end]
