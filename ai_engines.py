@@ -1,5 +1,3 @@
-[file name]: ai_engines.py
-[file content begin]
 # ai_engines.py
 import numpy as np
 import time
@@ -541,4 +539,3 @@ AI_MODE_BUTTONS = {
 def get_ai_mode_buttons():
     """Return list of all AI mode buttons for keyboard"""
     return list(AI_MODE_BUTTONS.values())
-[file content end]
