@@ -6,18 +6,18 @@ import random
 # ==========================================================
 # 🌟 Premium Emojis for AI Messages
 # ==========================================================
-P_AI_CHECK = '<tg-emoji emoji-id="5807868868886009920">✅</tg-emoji>'
-P_AI_CROSS = '<tg-emoji emoji-id="5807461353799030682">❌</tg-emoji>'
-P_AI_INFO = '<tg-emoji emoji-id="5877443460725739250">ℹ️</tg-emoji>'
-P_AI_HOURGLASS = '<tg-emoji emoji-id="5890997763331591703">⏳</tg-emoji>'
-P_AI_UP = '<tg-emoji emoji-id="5967574255670399788">⬆️</tg-emoji>'
+P_AI_CHECK = '<tg-emoji emoji-id="6210787138267515780">✅</tg-emoji>'
+P_AI_CROSS = '<tg-emoji emoji-id="6210787138267515780">❌</tg-emoji>'
+P_AI_INFO = '<tg-emoji emoji-id="6210787138267515780">ℹ️</tg-emoji>'
+P_AI_HOURGLASS = '<tg-emoji emoji-id="6210787138267515780">⏳</tg-emoji>'
+P_AI_UP = '<tg-emoji emoji-id="6210787138267515780">⬆️</tg-emoji>'
 P_AI_DOWN = '<tg-emoji emoji-id="5875180111744995604">⬇️</tg-emoji>'
 P_AI_LEFT_RIGHT = '<tg-emoji emoji-id="5848119413041431362">↔️</tg-emoji>'
 P_AI_SPARKLES = '<tg-emoji emoji-id="5884289942371401145">✨</tg-emoji>'
-P_AI_PATTERN = '<tg-emoji emoji-id="5868656545634689320">🎯</tg-emoji>'
-P_AI_MARTINGALE = '<tg-emoji emoji-id="5868108575387671725">🎲</tg-emoji>'
+P_AI_PATTERN = '<tg-emoji emoji-id="6210787138267515780">🎯</tg-emoji>'
+P_AI_MARTINGALE = '<tg-emoji emoji-id="6210787138267515780">🎲</tg-emoji>'
 P_AI_ANTIMARTINGALE = '<tg-emoji emoji-id="5868665489092263539">🔄</tg-emoji>'
-P_AI_TREND = '<tg-emoji emoji-id="5877652234091891383">📊</tg-emoji>'
+P_AI_TREND = '<tg-emoji emoji-id="6210787138267515780">📊</tg-emoji>'
 P_AI_FIBONACCI = '<tg-emoji emoji-id="5877260593903177342">🔢</tg-emoji>'
 P_AI_GOLDEN = '<tg-emoji emoji-id="5869547610204280761">🎯</tg-emoji>'
 P_AI_MOMENTUM = '<tg-emoji emoji-id="5884248697980608904">📈</tg-emoji>'
@@ -45,23 +45,23 @@ class AIEmoji:
 # 🎨 AI Mode Emoji IDs for Reply Keyboard
 # ==========================================================
 AI_MODE_EMOJIS = {
-    "🎯 Pattern AI": "6114102463747332294",
-    "🎲 Martingale AI": "6113995669385515849",
-    "🔄 Anti-Martingale AI": "6210747139237088236",
-    "📊 Trend Following": "5431577498364158238",
-    "🔢 Fibonacci AI": "5884290437459480896",
-    "🎯 Golden Ratio": "6114102463747332294",
-    "📈 Momentum AI": "5269460053651366623",
-    "🎲 Monte Carlo": "6113995669385515849",
-    "🧬 Neural Pattern": "5212936673423274058",
-    "⚡ Quick Reversal": "6210787138267515780",
-    "🌊 Wave Analysis": "5431685735835011215",
-    "🎪 Chaos Theory": "6251379582851614396",
-    "🤖 Ensemble AI": "6300674206703027915",
-    "📐 Bayesian AI": "5366380461746563803",
-    "🔗 Markov Chain": "6210879046272682741",
-    "🧪 ML Style AI": "6190369920304289234",
-    "🎡 Circle Rnd": "5226711870492126219",
+    "Pattern AI": "6114102463747332294",
+    "Martingale AI": "6113995669385515849",
+    "Anti-Martingale AI": "6210747139237088236",
+    "Trend Following": "5431577498364158238",
+    "Fibonacci AI": "5884290437459480896",
+    "Golden Ratio": "6114102463747332294",
+    "Momentum AI": "5269460053651366623",
+    "Monte Carlo": "6113995669385515849",
+    "Neural Pattern": "5212936673423274058",
+    "Quick Reversal": "6210787138267515780",
+    "Wave Analysis": "5431685735835011215",
+    "Chaos Theory": "6251379582851614396",
+    "Ensemble AI": "6300674206703027915",
+    "Bayesian AI": "5366380461746563803",
+    "Markov Chain": "6210879046272682741",
+    "ML Style AI": "6190369920304289234",
+    "Circle Rnd": "5226711870492126219",
 }
 
 # ==========================================
@@ -422,23 +422,23 @@ def circle_rnd_predict(history_docs):
 # ========== AI MODES DICTIONARY ==========
 # ✅ AI Mode Names with Emojis (For Reply Keyboard)
 AI_MODE_NAMES = {
-    "pattern": "Pattern AI",
-    "martingale": "Martingale AI",
-    "anti_martingale": "Anti-Martingale AI",
-    "trend_following": "Trend Following",
-    "fibonacci": "Fibonacci AI",
-    "golden_ratio": "Golden Ratio",
-    "momentum": "Momentum AI",
-    "monte_carlo": "Monte Carlo",
-    "neural_pattern": "Neural Pattern",
-    "quick_reversal": "Quick Reversal",
-    "wave_analysis": "Wave Analysis",
-    "chaos_theory": "Chaos Theory",
-    "ensemble": "Ensemble AI",
-    "bayesian": "Bayesian AI",
-    "markov_chain": "Markov Chain",
-    "ml_style": "ML Style AI",
-    "circle_rnd": "Circle Rnd",
+    "pattern": "🎯 Pattern AI",
+    "martingale": "🎲 Martingale AI",
+    "anti_martingale": "🔄 Anti-Martingale AI",
+    "trend_following": "📊 Trend Following",
+    "fibonacci": "🔢 Fibonacci AI",
+    "golden_ratio": "🎯 Golden Ratio",
+    "momentum": "📈 Momentum AI",
+    "monte_carlo": "🎲 Monte Carlo",
+    "neural_pattern": "🧬 Neural Pattern",
+    "quick_reversal": "⚡ Quick Reversal",
+    "wave_analysis": "🌊 Wave Analysis",
+    "chaos_theory": "🎪 Chaos Theory",
+    "ensemble": "🤖 Ensemble AI",
+    "bayesian": "📐 Bayesian AI",
+    "markov_chain": "🔗 Markov Chain",
+    "ml_style": "🧪 ML Style AI",
+    "circle_rnd": "🎡 Circle Rnd",
 }
 
 AI_MODES = {
