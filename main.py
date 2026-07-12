@@ -546,11 +546,19 @@ async def process_password(message: types.Message, state: FSMContext):
     )
     page = await context.new_page()
     
+    # 🚀 SPEED OPTIMIZATION: ပုံများ၊ CSS နှင့် Font များကို ပိတ်ထားမည် (Loading အရမ်းမြန်သွားစေရန်)
+    async def intercept_route(route):
+        if route.request.resource_type in ["image", "media", "font", "stylesheet"]:
+            await route.abort()
+        else:
+            await route.continue_()
+    
+    await page.route("**/*", intercept_route)
+
     try:
-        # 30% - Login စာမျက်နှာသို့ သွားခြင်း
+        # 30% - Login စာမျက်နှာသို့ သွားခြင်း (networkidle အစား domcontentloaded ကိုသုံး၍ မြန်မြန်သွားမည်)
         await update_progress(loading_msg, 30)
-        await page.goto(login_url, wait_until="networkidle", timeout=60000)
-        await page.wait_for_timeout(3000)
+        await page.goto(login_url, wait_until="domcontentloaded", timeout=15000)
 
         # 50% - ဖုန်းနံပါတ်နှင့် စကားဝှက် ရိုက်ထည့်ခြင်း
         await update_progress(loading_msg, 50)
@@ -574,19 +582,22 @@ async def process_password(message: types.Message, state: FSMContext):
         }
         """
         await page.evaluate(js_code, [username, password])
-        await page.wait_for_timeout(1000)
         
         # 70% - Login ခလုတ်နှိပ်ခြင်း
         await update_progress(loading_msg, 70)
         await page.evaluate("() => { let btn = document.querySelector('button.active'); if (btn) btn.click(); }")
-        await page.wait_for_timeout(5000)
+        
+        # 🚀 SPEED OPTIMIZATION: URL ပြောင်းသွားတာကိုပဲ စောင့်မည် (စက္ကန့်အသေမစောင့်တော့ပါ)
+        try:
+            await page.wait_for_url("**/main**", timeout=5000)
+        except Exception:
+            pass
         
         try:
-            for _ in range(3):
+            for _ in range(2):
                 btn = await page.query_selector(".announcement-dialog__button")
                 if btn:
                     await btn.click()
-                    await page.wait_for_timeout(1000)
                 else:
                     break
         except Exception: 
@@ -596,8 +607,8 @@ async def process_password(message: types.Message, state: FSMContext):
             # 85% - Main စာမျက်နှာသို့သွား၍ အချက်အလက်များယူခြင်း
             await update_progress(loading_msg, 85)
             try:
-                await page.goto(main_url, wait_until="networkidle")
-                await page.wait_for_timeout(3000)
+                # domcontentloaded သုံးပြီး အမြန်သွားမည်
+                await page.goto(main_url, wait_until="domcontentloaded")
             except Exception: 
                 pass
 
@@ -606,23 +617,23 @@ async def process_password(message: types.Message, state: FSMContext):
             balance_text = "0.00 Ks"
             site_login_time = get_myanmar_time().strftime("%Y-%m-%d %H:%M:%S")
 
+            # 🚀 SPEED OPTIMIZATION: Data ပေါ်လာတာကိုပဲ စောင့်ယူမည် (timeout 2000 ဖြင့်အမြန်စစ်မည်)
             try:
                 nick_el = page.locator('.userInfo__container-content-nickname h3').first
-                if await nick_el.is_visible(timeout=3000): 
+                if await nick_el.is_visible(timeout=2000): 
                     nickname = await nick_el.inner_text()
                 
                 uid_el = page.locator('.userInfo__container-content-uid span:nth-child(3)').first
-                if await uid_el.is_visible(timeout=2000): 
+                if await uid_el.is_visible(timeout=1000): 
                     user_id = await uid_el.inner_text()
                     
                 balance_el = page.locator('.balance_info p.totalSavings__container-header__subtitle span').first
-                if await balance_el.is_visible(timeout=2000): 
+                if await balance_el.is_visible(timeout=1000): 
                     balance_text = await balance_el.inner_text()
             except Exception: 
                 pass
 
-            await page.goto(game_url, wait_until="networkidle")
-            await page.wait_for_timeout(2000)
+            await page.goto(game_url, wait_until="domcontentloaded")
 
             db_user = await db.get_user(user_tg_id)
             if db_user:
@@ -664,7 +675,6 @@ async def process_password(message: types.Message, state: FSMContext):
 
             # 100% - အရာအားလုံးပြီးစီးခြင်း
             await update_progress(loading_msg, 100)
-            await asyncio.sleep(0.5) 
             
             # --- 🎨 Generate Custom Image using Playwright (Advanced Design) ---
             html_card = f"""
