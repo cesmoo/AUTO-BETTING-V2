@@ -1,5 +1,4 @@
-[file name]: xxx.py
-[file content begin]
+
 import asyncio
 import os
 import html
