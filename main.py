@@ -8,6 +8,7 @@ import re
 import string
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from PIL import Image, ImageDraw, ImageFont
 
 from aiogram import Bot, Dispatcher, types, F, BaseMiddleware
 from aiogram.filters import Command
@@ -189,6 +190,116 @@ def get_myanmar_time() -> datetime:
     return datetime.utcnow() + timedelta(hours=6, minutes=30)
 
 # ==========================================================
+# 🖼️ Image Generator using Template
+# ==========================================================
+def generate_login_image(
+    site_name: str,
+    user_id: str,
+    username: str,
+    nickname: str,
+    balance: str,
+    developer: str = "@iwillgoforwardalone"
+):
+    """Template ပုံပေါ်မှာ User Data တွေထည့်ပြီး Image ထုတ်ပေးမယ်"""
+    
+    template_path = "login_template.png"
+    
+    # Template ပုံမရှိရင် Dynamic ဆွဲပေးမယ်
+    if not os.path.exists(template_path):
+        return generate_login_image_dynamic(site_name, user_id, username, nickname, balance, developer)
+    
+    try:
+        img = Image.open(template_path)
+        draw = ImageDraw.Draw(img)
+        
+        # Font သတ်မှတ်မယ်
+        try:
+            font_value = ImageFont.truetype("arialbd.ttf", 20)
+        except:
+            try:
+                font_value = ImageFont.truetype("arial.ttf", 20)
+            except:
+                font_value = ImageFont.load_default()
+        
+        # 📌 Data တွေကို Template ပုံပေါ်မှာ ထည့်မယ်
+        # ဒီနေရာတွေက ပုံထဲက စာသားတွေရဲ့ ဘေးမှာ ထည့်ဖို့ပါ
+        draw.text((250, 98), site_name.upper(), fill=(255, 255, 255), font=font_value)
+        draw.text((250, 143), user_id, fill=(255, 255, 255), font=font_value)
+        draw.text((250, 188), username, fill=(255, 255, 255), font=font_value)
+        draw.text((250, 233), f"{balance} Ks", fill=(0, 255, 100), font=font_value)
+        
+        output_path = f"login_{user_id.replace(' ', '')}.png"
+        img.save(output_path)
+        return output_path
+        
+    except Exception as e:
+        print(f"Template Error: {e}")
+        return generate_login_image_dynamic(site_name, user_id, username, nickname, balance, developer)
+
+def generate_login_image_dynamic(
+    site_name: str,
+    user_id: str,
+    username: str,
+    nickname: str,
+    balance: str,
+    developer: str = "@iwillgoforwardalone"
+):
+    """Template မရှိရင် Dynamic ဆွဲပေးမယ်"""
+    width, height = 500, 480
+    
+    img = Image.new('RGB', (width, height), color=(16, 20, 45))
+    draw = ImageDraw.Draw(img)
+    
+    # Border
+    draw.rectangle([(5, 5), (width-5, height-5)], outline=(50, 60, 100), width=2)
+    
+    try:
+        font_title = ImageFont.truetype("arialbd.ttf", 26)
+        font_label = ImageFont.truetype("arial.ttf", 16)
+        font_value = ImageFont.truetype("arialbd.ttf", 18)
+        font_button = ImageFont.truetype("arialbd.ttf", 14)
+        font_small = ImageFont.truetype("arial.ttf", 12)
+    except:
+        font_title = ImageFont.load_default()
+        font_label = ImageFont.load_default()
+        font_value = ImageFont.load_default()
+        font_button = ImageFont.load_default()
+        font_small = ImageFont.load_default()
+    
+    # Title
+    draw.text((150, 25), "✅ LOGIN SUCCESSFUL", fill=(0, 255, 100), font=font_title)
+    draw.line([(40, 75), (width-40, 75)], fill=(60, 70, 120), width=2)
+    
+    # Labels
+    draw.text((45, 100), "SITE", fill=(140, 150, 200), font=font_label)
+    draw.text((250, 98), site_name.upper(), fill=(255, 255, 255), font=font_value)
+    
+    draw.text((45, 145), "USER ID", fill=(140, 150, 200), font=font_label)
+    draw.text((250, 143), user_id, fill=(255, 255, 255), font=font_value)
+    
+    draw.text((45, 190), "USERNAME", fill=(140, 150, 200), font=font_label)
+    draw.text((250, 188), username, fill=(255, 255, 255), font=font_value)
+    
+    draw.text((45, 235), "BALANCE", fill=(140, 150, 200), font=font_label)
+    draw.text((250, 233), f"{balance} Ks", fill=(0, 255, 100), font=font_value)
+    
+    draw.line([(40, 280), (width-40, 280)], fill=(60, 70, 120), width=2)
+    
+    # Buttons
+    draw.rectangle([(45, 300), (240, 345)], fill=(0, 130, 60), outline=(0, 200, 100), width=2)
+    draw.text((65, 312), "➕ Add Funds", fill=(255, 255, 255), font=font_button)
+    
+    draw.rectangle([(260, 300), (455, 345)], fill=(0, 80, 180), outline=(0, 150, 255), width=2)
+    draw.text((280, 312), "📊 View History", fill=(255, 255, 255), font=font_button)
+    
+    # Developer
+    draw.text((170, 370), f"Developed by {developer}", fill=(80, 90, 140), font=font_small)
+    
+    output_path = "login_success.png"
+    img.save(output_path)
+    return output_path
+
+# ==========================================================
 # 🛡️ Auth Middleware (သုံးခွင့်ရှိ/မရှိ စစ်ဆေးရေးဂိတ်)
 # ==========================================================
 class AuthMiddleware(BaseMiddleware):
@@ -275,8 +386,7 @@ class LoginForm(StatesGroup):
 def get_main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [E_LOGIN], 
-            [E_GAMES]
+            [E_LOGIN]
         ],
         resize_keyboard=True
     )
@@ -528,12 +638,12 @@ async def process_password(message: types.Message, state: FSMContext):
         empty = 10 - filled
         bar = "■" * filled + "□" * empty
         try:
-            await msg.edit_text(f"{bar} Logging in... {pct}%")
+            await msg.edit_text(f"{bar} {pct}%")
         except Exception:
             pass
 
     # Initial Loading State 0%
-    loading_msg = await message.answer("□□□□□□□□□□ Logging in... 0%")
+    loading_msg = await message.answer("□ 0%")
     
     # 10% - Browser စတင်ဖွင့်ခြင်း
     await update_progress(loading_msg, 10)
@@ -546,11 +656,17 @@ async def process_password(message: types.Message, state: FSMContext):
     )
     page = await context.new_page()
     
+    # 20% - Browser ဖွင့်ပြီးခြင်း
+    await update_progress(loading_msg, 20)
+    
     try:
         # 30% - Login စာမျက်နှာသို့ သွားခြင်း
         await update_progress(loading_msg, 30)
         await page.goto(login_url, wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(3000)
+
+        # 40% - Page Load ပြီးခြင်း
+        await update_progress(loading_msg, 40)
 
         # 50% - ဖုန်းနံပါတ်နှင့် စကားဝှက် ရိုက်ထည့်ခြင်း
         await update_progress(loading_msg, 50)
@@ -576,10 +692,16 @@ async def process_password(message: types.Message, state: FSMContext):
         await page.evaluate(js_code, [username, password])
         await page.wait_for_timeout(1000)
         
+        # 60% - Form ဖြည့်ပြီးခြင်း
+        await update_progress(loading_msg, 60)
+
         # 70% - Login ခလုတ်နှိပ်ခြင်း
         await update_progress(loading_msg, 70)
         await page.evaluate("() => { let btn = document.querySelector('button.active'); if (btn) btn.click(); }")
         await page.wait_for_timeout(5000)
+        
+        # 80% - Login အောင်မြင်ခြင်း
+        await update_progress(loading_msg, 80)
         
         try:
             for _ in range(3):
@@ -624,6 +746,9 @@ async def process_password(message: types.Message, state: FSMContext):
             await page.goto(game_url, wait_until="networkidle")
             await page.wait_for_timeout(2000)
 
+            # 90% - Data ယူပြီးခြင်း
+            await update_progress(loading_msg, 90)
+
             db_user = await db.get_user(user_tg_id)
             if db_user:
                 ai_mode = db_user.get("ai_mode", "🎯 Pattern AI")
@@ -666,7 +791,40 @@ async def process_password(message: types.Message, state: FSMContext):
             await update_progress(loading_msg, 100)
             await asyncio.sleep(0.5) 
             
-            await message.answer(f"𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦 ({site_name})", reply_markup=get_logged_in_keyboard())
+            # ✅ Login Success Image ထုတ်မယ်
+            image_path = generate_login_image(
+                site_name=site_name,
+                user_id=user_id.strip(),
+                username=username,
+                nickname=nickname.strip(),
+                balance=balance_text.strip()
+            )
+            
+            login_image = FSInputFile(image_path)
+            
+            caption = (
+                f"<b>✅ LOGIN SUCCESSFUL!</b>\n\n"
+                f"<b>🌐 Site:</b> {site_name}\n"
+                f"<b>🆔 User ID:</b> {user_id.strip()}\n"
+                f"<b>📱 Username:</b> {username}\n"
+                f"<b>🏷️ Nickname:</b> {nickname.strip()}\n"
+                f"<b>💰 Balance:</b> {balance_text.strip()}\n"
+                f"<b>📅 Login Date:</b> {site_login_time}\n\n"
+                f"<i>Developed by @iwillgoforwardalone</i>"
+            )
+            
+            await message.answer_photo(
+                photo=login_image,
+                caption=caption,
+                reply_markup=get_logged_in_keyboard()
+            )
+            
+            # ပုံကို ဖျက်မယ် (မသိမ်းချင်ရင်)
+            try:
+                os.remove(image_path)
+            except:
+                pass
+            
             await state.set_state(LoginForm.main_menu)
             
         else:
