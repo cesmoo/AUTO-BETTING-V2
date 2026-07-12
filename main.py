@@ -1421,7 +1421,9 @@ async def logout(message: types.Message, state: FSMContext):
     await message.answer("👋 အကောင့်ထွက်ပြီးပါပြီ။", reply_markup=get_main_keyboard())
 
 
-# ============ Main Keyboard Function ============
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+
+# ============ Main Keyboard Function (Premium emoji ထည့်ပြီး) ============
 def get_main_keyboard():
     """
     Main Reply Keyboard ကို Premium emoji နဲ့ ပြန်ပေးတဲ့ function
@@ -1430,31 +1432,30 @@ def get_main_keyboard():
         keyboard=[
             [
                 KeyboardButton(
-                    text="🎰 Games",  # ← ဒီစာသားက F.text == "🎰 Games" နဲ့ ကိုက်ရမယ်
-                    icon_custom_emoji_id="5228920000686131979"  # ← Premium emoji ID (သင့်ဟာနဲ့အစားထိုးပါ)
+                    text="Games",  # ← ဒီစာသားက F.text == "🎰 Games" နဲ့ ကိုက်ရမယ်
+                    icon_custom_emoji_id="6300961484180556340"  # ← Premium emoji ID (သင့်ဟာနဲ့အစားထိုးပါ)
                 )
             ],
             [
                 KeyboardButton(
-                    text="📊 My Stats",
-                    # icon_custom_emoji_id="5228920000686131980"  # ← နောက်ထပ် Premium emoji ထည့်ချင်ရင်
+                    text="▶️ Start Auto-Bet",
+                    # icon_custom_emoji_id="YOUR_EMOJI_ID_HERE"  # ← နောက်ထပ် Premium emoji ထည့်ချင်ရင်
                 )
             ],
             [
                 KeyboardButton(
-                    text="⚙️ Settings"
-                    # icon_custom_emoji_id="5228920000686131981"  # ← နောက်ထပ် Premium emoji ထည့်ချင်ရင်
+                    text="🛑 Stop Auto-Bet",
+                    # icon_custom_emoji_id="YOUR_EMOJI_ID_HERE"  # ← နောက်ထပ် Premium emoji ထည့်ချင်ရင်
                 )
             ]
         ],
-        resize_keyboard=True,
-        one_time_keyboard=False
+        resize_keyboard=True
     )
     return keyboard
 
 
-# ============ Handler Function ============
-@dp.message(F.text == "🎰 Games")  # ← ဒီဟာကို မပြောင်းပါနဲ့ (ခလုတ်နဲ့ကိုက်ရမယ်)
+# ============ Handler Function (မပြောင်းဘူး) ============
+@dp.message(F.text == "Games")  # ← ဒီဟာကို မပြောင်းပါနဲ့
 async def games(message: types.Message):
     await message.answer(
         "🎮 <b>Game ရွေးချယ်ရန်:</b>\nWin Go 30s ကို ရွေးချယ်ထားပါသည်။\n\n"
