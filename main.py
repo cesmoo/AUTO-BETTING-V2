@@ -1,4 +1,4 @@
-
+#app.py
 import asyncio
 import os
 import html
@@ -9,7 +9,6 @@ import re
 import string
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-from PIL import Image, ImageDraw, ImageFont
 
 from aiogram import Bot, Dispatcher, types, F, BaseMiddleware
 from aiogram.filters import Command
@@ -35,142 +34,13 @@ from ai_engines import AI_MODES, AI_MODE_EMOJIS
 # ==========================================================
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-OWNER_ID = int(os.getenv("OWNER_ID", "0"))
+OWNER_ID = int(os.getenv("OWNER_ID", "0")) # .env တွင်ထည့်ရန်
 
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
 active_sessions = {}
-
-# ==========================================================
-# 🖼️ Template Image Generator
-# ==========================================================
-def generate_login_image(
-    site_name: str,
-    user_id: str,
-    username: str,
-    nickname: str,
-    balance: str,
-    developer: str = "@iwillgoforwardalone"
-):
-    """Template ပုံပေါ်မှာ User Data တွေထည့်ပြီး Image ထုတ်ပေးမယ်"""
-    
-    template_path = "login_template.png"
-    
-    # Template ပုံမရှိရင် Dynamic ဆွဲပေးမယ်
-    if not os.path.exists(template_path):
-        return generate_login_image_dynamic(site_name, user_id, username, nickname, balance, developer)
-    
-    try:
-        img = Image.open(template_path)
-        draw = ImageDraw.Draw(img)
-        
-        # Font သတ်မှတ်မယ် (1333x800 အတွက်)
-        try:
-            font_value = ImageFont.truetype("arialbd.ttf", 36)
-        except:
-            try:
-                font_value = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 36)
-            except:
-                font_value = ImageFont.load_default()
-        
-        # 🎯 နေရာကွက်တိ (1333x800 အတွက်)
-        # SITE - (x=636, y=160)
-        draw.text((636, 160), site_name.upper(), fill=(255, 255, 255), font=font_value)
-        
-        # USER ID - (x=636, y=240)
-        draw.text((636, 240), user_id, fill=(255, 255, 255), font=font_value)
-        
-        # USERNAME - (x=636, y=320)
-        draw.text((636, 320), username, fill=(255, 255, 255), font=font_value)
-        
-        # BALANCE - (x=636, y=400) Green Color
-        draw.text((636, 400), f"{balance} Ks", fill=(0, 255, 100), font=font_value)
-        
-        output_path = f"login_{user_id.replace(' ', '')}.png"
-        img.save(output_path)
-        return output_path
-        
-    except Exception as e:
-        print(f"Template Error: {e}")
-        return generate_login_image_dynamic(site_name, user_id, username, nickname, balance, developer)
-
-def generate_login_image_dynamic(
-    site_name: str,
-    user_id: str,
-    username: str,
-    nickname: str,
-    balance: str,
-    developer: str = "@iwillgoforwardalone"
-):
-    """Template မရှိရင် Dynamic ဆွဲပေးမယ် (1333x800 အတွက်)"""
-    width, height = 1333, 800
-    
-    img = Image.new('RGB', (width, height), color=(16, 20, 45))
-    draw = ImageDraw.Draw(img)
-    
-    draw.rectangle([(10, 10), (width-10, height-10)], outline=(50, 60, 100), width=3)
-    
-    try:
-        font_title = ImageFont.truetype("arialbd.ttf", 48)
-        font_label = ImageFont.truetype("arial.ttf", 30)
-        font_value = ImageFont.truetype("arialbd.ttf", 36)
-        font_button = ImageFont.truetype("arialbd.ttf", 28)
-        font_small = ImageFont.truetype("arial.ttf", 22)
-    except:
-        try:
-            font_title = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 48)
-            font_label = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 30)
-            font_value = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 36)
-            font_button = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 28)
-            font_small = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 22)
-        except:
-            font_title = ImageFont.load_default()
-            font_label = ImageFont.load_default()
-            font_value = ImageFont.load_default()
-            font_button = ImageFont.load_default()
-            font_small = ImageFont.load_default()
-    
-    # Title
-    title = "✅ LOGIN SUCCESSFUL"
-    title_bbox = draw.textbbox((0, 0), title, font=font_title)
-    title_width = title_bbox[2] - title_bbox[0]
-    draw.text(((width - title_width) // 2, 50), title, fill=(0, 255, 100), font=font_title)
-    
-    draw.line([(100, 130), (width-100, 130)], fill=(60, 70, 120), width=3)
-    
-    # Labels
-    draw.text((100, 170), "SITE", fill=(140, 150, 200), font=font_label)
-    draw.text((636, 160), site_name.upper(), fill=(255, 255, 255), font=font_value)
-    
-    draw.text((100, 250), "USER ID", fill=(140, 150, 200), font=font_label)
-    draw.text((636, 240), user_id, fill=(255, 255, 255), font=font_value)
-    
-    draw.text((100, 330), "USERNAME", fill=(140, 150, 200), font=font_label)
-    draw.text((636, 320), username, fill=(255, 255, 255), font=font_value)
-    
-    draw.text((100, 410), "BALANCE", fill=(140, 150, 200), font=font_label)
-    draw.text((636, 400), f"{balance} Ks", fill=(0, 255, 100), font=font_value)
-    
-    draw.line([(100, 480), (width-100, 480)], fill=(60, 70, 120), width=3)
-    
-    # Buttons
-    draw.rectangle([(150, 510), (550, 580)], fill=(0, 130, 60), outline=(0, 200, 100), width=3)
-    draw.text((220, 535), "➕ Add Funds", fill=(255, 255, 255), font=font_button)
-    
-    draw.rectangle([(650, 510), (1050, 580)], fill=(0, 80, 180), outline=(0, 150, 255), width=3)
-    draw.text((720, 535), "📊 View History", fill=(255, 255, 255), font=font_button)
-    
-    # Developer
-    dev_text = f"Developed by {developer}"
-    dev_bbox = draw.textbbox((0, 0), dev_text, font=font_small)
-    dev_width = dev_bbox[2] - dev_bbox[0]
-    draw.text(((width - dev_width) // 2, 620), dev_text, fill=(80, 90, 140), font=font_small)
-    
-    output_path = "login_success.png"
-    img.save(output_path)
-    return output_path
 
 # ==========================================================
 # 🌟 Premium Emojis + Style for Reply Keyboard (Aiogram 3.x)
@@ -195,85 +65,85 @@ TEXT_BACK = "Back"
 E_INFO = KeyboardButton(
     text=TEXT_INFO, 
     icon_custom_emoji_id="5868656545634689320",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_BALANCE = KeyboardButton(
     text=TEXT_BALANCE, 
     icon_custom_emoji_id="5868108575387671725",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_STATUS = KeyboardButton(
     text=TEXT_STATUS, 
     icon_custom_emoji_id="5877443460725739250",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_START = KeyboardButton(
     text=TEXT_START, 
     icon_custom_emoji_id="5884248697980608904",
-    style="success"
+    style="success"  # 🟢 Green
 )
 
 E_STOP = KeyboardButton(
     text=TEXT_STOP, 
     icon_custom_emoji_id="5884289942371401145",
-    style="danger"
+    style="danger"  # 🔴 Red
 )
 
 E_GAMES = KeyboardButton(
     text=TEXT_GAMES, 
     icon_custom_emoji_id="5868665489092263539",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_AI = KeyboardButton(
     text=TEXT_AI, 
     icon_custom_emoji_id="5877652234091891383",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_BETSIZE = KeyboardButton(
     text=TEXT_BETSIZE, 
     icon_custom_emoji_id="5877260593903177342",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_PROFIT = KeyboardButton(
     text=TEXT_PROFIT, 
     icon_custom_emoji_id="5967574255670399788",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_HIT = KeyboardButton(
     text=TEXT_HIT, 
     icon_custom_emoji_id="5869547610204280761",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_PREDICT = KeyboardButton(
     text=TEXT_PREDICT, 
     icon_custom_emoji_id="5890997763331591703",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_LOGOUT = KeyboardButton(
     text=TEXT_LOGOUT, 
     icon_custom_emoji_id="5875180111744995604",
-    style="danger"
+    style="danger"  # 🔴 Red
 )
 
 E_LOGIN = KeyboardButton(
     text=TEXT_LOGIN, 
     icon_custom_emoji_id="5884041323843955199",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 E_BACK = KeyboardButton(
     text=TEXT_BACK, 
     icon_custom_emoji_id="5848119413041431362",
-    style="primary"
+    style="primary"  # 🔵 Blue
 )
 
 # Premium Emojis for Messages
@@ -288,6 +158,7 @@ P_6 = '<tg-emoji emoji-id="5807461353799030682">⚙️</tg-emoji>'
 # 🛠️ Helper Functions
 # ==========================================================
 def extract_balance(bal_str: str) -> float:
+    """String အနေဖြင့်ရလာသော Balance ကို ဂဏန်း(Float) အဖြစ်ပြောင်းပေးရန်"""
     try:
         clean_str = re.sub(r'[^\d.]', '', bal_str)
         if clean_str:
@@ -298,6 +169,7 @@ def extract_balance(bal_str: str) -> float:
         return 0.0
 
 async def delete_message_later(msg: types.Message, delay: int = 5):
+    """သတ်မှတ်ထားသောအချိန်အကြာတွင် Message ကို အလိုအလျောက်ဖျက်ပေးမည်"""
     await asyncio.sleep(delay)
     try:
         await msg.delete()
@@ -305,6 +177,7 @@ async def delete_message_later(msg: types.Message, delay: int = 5):
         pass
 
 def parse_duration(duration_str: str):
+    """'2H', '5D' စသည့် format များကို timedelta သို့ပြောင်းပေးရန်"""
     duration_str = duration_str.upper()
     if duration_str.endswith('H') and duration_str[:-1].isdigit():
         return timedelta(hours=int(duration_str[:-1]))
@@ -313,10 +186,11 @@ def parse_duration(duration_str: str):
     return None
 
 def get_myanmar_time() -> datetime:
+    """Server Time အစား Myanmar Time (UTC+6:30) အတိအကျကို ယူရန်"""
     return datetime.utcnow() + timedelta(hours=6, minutes=30)
 
 # ==========================================================
-# 🛡️ Auth Middleware
+# 🛡️ Auth Middleware (သုံးခွင့်ရှိ/မရှိ စစ်ဆေးရေးဂိတ်)
 # ==========================================================
 class AuthMiddleware(BaseMiddleware):
     async def __call__(self, handler, event, data):
@@ -330,12 +204,15 @@ class AuthMiddleware(BaseMiddleware):
             user_id = event.from_user.id
             
         if user_id:
+            # Owner ဆိုလျှင် အမြဲဖြတ်သန်းခွင့်ပေးမည်
             if user_id == OWNER_ID:
                 return await handler(event, data)
             
+            # Key 16 လုံးရိုက်ထည့်လျှင် ဖြတ်ခွင့်ပေးမည် (Key ရိုက်ထည့်နေစဉ် Block မဖြစ်စေရန်)
             if isinstance(event, types.Message) and len(text) == 16 and text[:8].isdigit() and text[8:].isupper():
                 return await handler(event, data)
                 
+            # DB မှ သက်တမ်းစစ်ဆေးခြင်း
             expire_iso = await db.get_user_subscription(user_id)
             is_authorized = False
             
@@ -355,6 +232,7 @@ class AuthMiddleware(BaseMiddleware):
         
         return await handler(event, data)
 
+# Middleware ကို တပ်ဆင်ခြင်း
 dp.message.middleware(AuthMiddleware())
 dp.callback_query.middleware(AuthMiddleware())
 
@@ -403,17 +281,20 @@ def get_main_keyboard():
         resize_keyboard=True
     )
 
+# ==========================================================
+# ⌨️ Site Selection Keyboard with Colors
+# ==========================================================
 def get_site_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [
                 KeyboardButton(
                     text="𝟳𝟳𝟳𝗕𝗜𝗚𝗪𝗜𝗡",
-                    style="success"
+                    style="success"  # 🟢 Green
                 ),
                 KeyboardButton(
                     text="𝗦𝗜𝗫 𝗟𝗢𝗧𝗧𝗘𝗥𝗬",
-                    style="danger"
+                    style="danger"  # 🔴 Red
                 )
             ],
             [E_BACK]
@@ -446,7 +327,7 @@ def get_ai_mode_keyboard():
         btn = KeyboardButton(
             text=mode_name,
             icon_custom_emoji_id=emoji_id,
-            style="primary"
+            style="primary"  # 🔵 Blue color
         )
         row.append(btn)
         if len(row) == 2:
@@ -455,6 +336,7 @@ def get_ai_mode_keyboard():
     if row:
         keyboard.append(row)
     
+    # Back button with premium emoji and style
     back_btn = KeyboardButton(
         text="🔙 ပင်မမီနူးသို့",
         icon_custom_emoji_id="5848119413041431362",
@@ -581,6 +463,7 @@ async def process_key_redemption(message: types.Message):
         new_expire = current_expire + td
         await db.update_user_subscription(user_id, new_expire.isoformat())
         
+        # 1 Key One Time (အသုံးပြုပြီးပါက ဖျက်မည်)
         await db.delete_key(key_str)
         
         await message.answer(
@@ -639,18 +522,20 @@ async def process_password(message: types.Message, state: FSMContext):
         main_url = "https://www.777bigwingame.app/#/main"
         game_url = "https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1"
 
-    # 📊 Progress Bar Update
+    # 📊 Progress Bar Update လုပ်ပေးမည့် Helper Function
     async def update_progress(msg: types.Message, pct: int):
         filled = pct // 10
         empty = 10 - filled
         bar = "■" * filled + "□" * empty
         try:
-            await msg.edit_text(f"{bar} {pct}%")
+            await msg.edit_text(f"{bar} Logging in... {pct}%")
         except Exception:
             pass
 
-    loading_msg = await message.answer("□ 0%")
+    # Initial Loading State 0%
+    loading_msg = await message.answer("□□□□□□□□□□ Logging in... 0%")
     
+    # 10% - Browser စတင်ဖွင့်ခြင်း
     await update_progress(loading_msg, 10)
     p = await async_playwright().start()
     browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
@@ -661,15 +546,13 @@ async def process_password(message: types.Message, state: FSMContext):
     )
     page = await context.new_page()
     
-    await update_progress(loading_msg, 20)
-    
     try:
+        # 30% - Login စာမျက်နှာသို့ သွားခြင်း
         await update_progress(loading_msg, 30)
         await page.goto(login_url, wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(3000)
 
-        await update_progress(loading_msg, 40)
-
+        # 50% - ဖုန်းနံပါတ်နှင့် စကားဝှက် ရိုက်ထည့်ခြင်း
         await update_progress(loading_msg, 50)
         js_code = """
         ([user, pwd]) => {
@@ -693,13 +576,10 @@ async def process_password(message: types.Message, state: FSMContext):
         await page.evaluate(js_code, [username, password])
         await page.wait_for_timeout(1000)
         
-        await update_progress(loading_msg, 60)
-
+        # 70% - Login ခလုတ်နှိပ်ခြင်း
         await update_progress(loading_msg, 70)
         await page.evaluate("() => { let btn = document.querySelector('button.active'); if (btn) btn.click(); }")
         await page.wait_for_timeout(5000)
-        
-        await update_progress(loading_msg, 80)
         
         try:
             for _ in range(3):
@@ -713,6 +593,7 @@ async def process_password(message: types.Message, state: FSMContext):
             pass
         
         if "login" not in page.url.lower():
+            # 85% - Main စာမျက်နှာသို့သွား၍ အချက်အလက်များယူခြင်း
             await update_progress(loading_msg, 85)
             try:
                 await page.goto(main_url, wait_until="networkidle")
@@ -742,8 +623,6 @@ async def process_password(message: types.Message, state: FSMContext):
 
             await page.goto(game_url, wait_until="networkidle")
             await page.wait_for_timeout(2000)
-
-            await update_progress(loading_msg, 90)
 
             db_user = await db.get_user(user_tg_id)
             if db_user:
@@ -783,64 +662,238 @@ async def process_password(message: types.Message, state: FSMContext):
                 "last_predicted_issue": None       
             }
 
+            # 100% - အရာအားလုံးပြီးစီးခြင်း
             await update_progress(loading_msg, 100)
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.5) 
             
-            # ✅ Generate Login Image from Template
-            try:
-                image_path = generate_login_image(
-                    site_name=site_name,
-                    user_id=user_id.strip(),
-                    username=username,
-                    nickname=nickname.strip(),
-                    balance=balance_text.strip()
-                )
+            # --- 🎨 Generate Custom Image using Playwright (Advanced Design) ---
+            html_card = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <meta charset="UTF-8">
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap');
                 
-                login_image = FSInputFile(image_path)
-                
-                caption = (
-                    f"<b>✅ LOGIN SUCCESSFUL!</b>\n\n"
-                    f"<b>🌐 Site:</b> {site_name}\n"
-                    f"<b>🆔 User ID:</b> {user_id.strip()}\n"
-                    f"<b>📱 Username:</b> {username}\n"
-                    f"<b>🏷️ Nickname:</b> {nickname.strip()}\n"
-                    f"<b>💰 Balance:</b> {balance_text.strip()}\n"
-                    f"<b>📅 Login Date:</b> {site_login_time}\n\n"
-                    f"<i>Developed by @iwillgoforwardalone</i>"
-                )
-                
-                await message.answer_photo(
-                    photo=login_image,
-                    caption=caption,
-                    reply_markup=get_logged_in_keyboard()
-                )
-                
-                # Delete image after sending
-                try:
-                    os.remove(image_path)
-                except:
-                    pass
+                body {{
+                    background: linear-gradient(135deg, #fff0f5 0%, #ffe4e1 100%);
+                    font-family: 'Montserrat', sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    margin: 0;
+                }}
+                .card-container {{
+                    padding: 20px;
+                    width: 450px;
+                }}
+                .header-container {{
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 25px;
+                }}
+                .check-circle {{
+                    width: 70px;
+                    height: 70px;
+                    background: #ffffff;
+                    border-radius: 50%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    box-shadow: 0 10px 20px rgba(255, 182, 193, 0.4), inset 0 -4px 10px rgba(0,0,0,0.05);
+                    margin-right: 20px;
+                }}
+                .check-circle svg {{
+                    width: 40px;
+                    height: 40px;
+                    fill: #ef8b9e;
+                }}
+                .header-text {{
+                    font-size: 26px;
+                    font-weight: 800;
+                    color: #333;
+                    letter-spacing: 1px;
+                }}
+                .data-row {{
+                    background: #ffffff;
+                    border-radius: 16px;
+                    padding: 15px 20px;
+                    margin-bottom: 15px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    box-shadow: -8px 0 0 #f8b4c4, 0 8px 15px rgba(200, 150, 160, 0.15);
+                    position: relative;
+                }}
+                .info-group {{
+                    display: flex;
+                    flex-direction: column;
+                }}
+                .label {{
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: #333;
+                    text-transform: uppercase;
+                    margin-bottom: 5px;
+                }}
+                .value {{
+                    font-size: 22px;
+                    font-weight: 800;
+                    color: #111;
+                }}
+                .icon-circle {{
+                    width: 38px;
+                    height: 38px;
+                    background: #ffe6eb;
+                    border-radius: 50%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+                }}
+                .icon-circle svg {{
+                    width: 20px;
+                    height: 20px;
+                    fill: #333;
+                }}
+                .balance-row {{
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }}
+                .btn {{
+                    padding: 8px 15px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: white;
+                    border: none;
+                    cursor: pointer;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                }}
+                .btn-add {{
+                    background: linear-gradient(135deg, #f06277, #d94a5e);
+                }}
+                .btn-history {{
+                    background: linear-gradient(135deg, #b4857b, #93685f);
+                }}
+                .footer {{
+                    text-align: center;
+                    margin-top: 25px;
+                }}
+                .footer-text {{
+                    background: transparent;
+                    border: 2px solid #e8a0b0;
+                    border-radius: 20px;
+                    padding: 8px 20px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #333;
+                    display: inline-block;
+                }}
+            </style>
+            </head>
+            <body>
+                <div class="card-container" id="login-card">
                     
-            except Exception as img_error:
-                # If image generation fails, send text message
-                print(f"Image generation error: {img_error}")
-                login_msg = (
-                    f"<b>✅ LOGIN SUCCESSFUL!</b>\n"
-                    f"━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                    f"<b>🌐 Site:</b> {site_name}\n"
-                    f"<b>👤 User Information:</b>\n"
-                    f"├─ <b>User ID:</b> {user_id.strip()}\n"
-                    f"├─ <b>Username:</b> {username}\n"
-                    f"├─ <b>Nickname:</b> {nickname.strip()}\n"
-                    f"├─ <b>Balance:</b> {balance_text.strip()}\n"
-                    f"└─ <b>Login Date:</b> {site_login_time}\n\n"
-                    f"<i>Developed by @iwillgoforwardalone</i>"
-                )
-                await message.answer(
-                    login_msg,
+                    <div class="header-container">
+                        <div class="check-circle">
+                            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                        </div>
+                        <div class="header-text">LOGIN SUCCESSFUL</div>
+                    </div>
+
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">SITE</div>
+                            <div class="value">{site_name}</div>
+                        </div>
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+                        </div>
+                    </div>
+
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">USER ID</div>
+                            <div class="value">{user_id.strip()}</div>
+                        </div>
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                        </div>
+                    </div>
+
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">USERNAME</div>
+                            <div class="value">{username}</div>
+                        </div>
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                        </div>
+                    </div>
+
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">BALANCE</div>
+                            <div class="value">{balance_text.strip()}</div>
+                        </div>
+                        <div class="balance-row">
+                            <button class="btn btn-add">Add Funds</button>
+                            <button class="btn btn-history">View History</button>
+                            <div class="icon-circle" style="margin-left:5px;">
+                                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.64-2.1 1.64-1.54 0-2.21-.86-2.27-1.84h-1.73c.1 1.79 1.32 2.92 3 3.26V20h1.86v-1.6c1.55-.26 2.89-1.3 2.89-2.97 0-2.12-1.63-2.82-3.66-3.29z"/></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="footer">
+                        <div class="footer-text">Developed by @iwillgoforwardalone</div>
+                    </div>
+
+                </div>
+            </body>
+            </html>
+            """
+            
+            img_path = f"login_success_{user_tg_id}.png"
+            temp_page = await context.new_page()
+            await temp_page.set_viewport_size({"width": 600, "height": 800})
+            await temp_page.set_content(html_card)
+            await temp_page.wait_for_timeout(1000) 
+            await temp_page.locator("#login-card").screenshot(path=img_path, omit_background=True)
+            await temp_page.close()
+            
+            # --- 📝 Caption စာသား ဖန်တီးခြင်း ---
+            caption_text = (
+                "🏆 <b>LOGIN SUCCESSFUL!</b>\n"
+                "━━━━━━━━━━━━━━━\n\n"
+                f"🌐 Site: {site_name}\n"
+                "👤 <b>User Information:</b>\n"
+                f"├── User ID: <code>{user_id.strip()}</code>\n"
+                f"├── Username: <code>{username}</code>\n"
+                f"├── Nickname: {nickname.strip()}\n"
+                f"├── Balance: {balance_text.strip()}\n"
+                f"└── Login Date: {site_login_time}"
+            )
+            
+            # User ထံသို့ ဓာတ်ပုံနှင့် စာသား တွဲပို့ပေးခြင်း
+            try:
+                photo = FSInputFile(img_path)
+                await message.answer_photo(
+                    photo=photo, 
+                    caption=caption_text, 
                     reply_markup=get_logged_in_keyboard()
                 )
-            
+            except Exception as e:
+                # ပုံပို့ရာတွင် အဆင်မပြေပါက စာသားသက်သက်သာ ပို့ပေးမည်
+                await message.answer(caption_text, reply_markup=get_logged_in_keyboard())
+            finally:
+                # အသုံးပြုပြီးသော ဓာတ်ပုံဖိုင်ကို ဖျက်ပစ်မည်
+                if os.path.exists(img_path):
+                    os.remove(img_path)
+
             await state.set_state(LoginForm.main_menu)
             
         else:
@@ -898,6 +951,7 @@ async def process_toggle_aipred(callback: types.CallbackQuery):
 async def prediction_broadcast_loop(user_tg_id, message: types.Message):
     api_error_count = 0
     
+    # ခြေရာခံမည့် Current & Longest Streaks များကို အစပြုရန်
     if "current_win_streak" not in active_sessions.get(user_tg_id, {}):
         active_sessions[user_tg_id]["current_win_streak"] = 0
         active_sessions[user_tg_id]["current_lose_streak"] = 0
@@ -914,6 +968,7 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                 if current_issue != last_issue:
                     active_sessions[user_tg_id]["last_predicted_issue"] = current_issue
                     
+                    # Longest Streaks များကို ယူရန်
                     long_w = active_sessions[user_tg_id].get("longest_win_streak", 0)
                     long_l = active_sessions[user_tg_id].get("longest_lose_streak", 0)
                     
@@ -941,22 +996,27 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                         if predicted_bet.lower() == actual_size:
                             status_text = f"{P_5}WIN{actual_result}"
                             
+                            # Win တွက်ချက်မှုများ
                             active_sessions[user_tg_id]["current_win_streak"] += 1
                             active_sessions[user_tg_id]["current_lose_streak"] = 0
                             
+                            # လက်ရှိ Win Streak သည် Longest ထက်များသွားပါက Update လုပ်မည်
                             if active_sessions[user_tg_id]["current_win_streak"] > active_sessions[user_tg_id]["longest_win_streak"]:
                                 active_sessions[user_tg_id]["longest_win_streak"] = active_sessions[user_tg_id]["current_win_streak"]
                         else:
                             status_text = f"{P_6} LOSE{actual_result}"
                             
+                            # Lose တွက်ချက်မှုများ
                             active_sessions[user_tg_id]["current_lose_streak"] += 1
                             active_sessions[user_tg_id]["current_win_streak"] = 0
                             
+                            # လက်ရှိ Lose Streak သည် Longest ထက်များသွားပါက Update လုပ်မည်
                             if active_sessions[user_tg_id]["current_lose_streak"] > active_sessions[user_tg_id]["longest_lose_streak"]:
                                 active_sessions[user_tg_id]["longest_lose_streak"] = active_sessions[user_tg_id]["current_lose_streak"]
                     else:
                         status_text = "⚖️ <b>DRAW (Timeout)</b>"
                         
+                    # ရလဒ်ထွက်ပြီးနောက် Update ဖြစ်သွားသော Longest Streaks များကို ပြန်ယူရန်
                     new_long_w = active_sessions[user_tg_id].get("longest_win_streak", 0)
                     new_long_l = active_sessions[user_tg_id].get("longest_lose_streak", 0)
                         
@@ -1081,6 +1141,7 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
     try:
         bet_choice = bet_type.lower()
         
+        # 1. Winning Tip (Dialog) တက်နေလျှင် ပိတ်မည်
         try:
             winning_tip = page.locator('.WinningTip__C').first
             if await winning_tip.is_visible(timeout=1000):
@@ -1095,6 +1156,7 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
         except Exception: 
             pass
 
+        # 2. အရောင်/အကြီးအသေး ရွေးမည်
         if bet_choice == "big": 
             await page.locator('.Betting__C-foot-b').click(timeout=5000, force=True) 
         elif bet_choice == "small": 
@@ -1112,6 +1174,7 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
 
         await page.wait_for_timeout(1000)
 
+        # 3. လောင်းကြေး (Multiplier) တွက်ချက်ခြင်း
         if amount >= 1000:
             multiplier = amount // 1000
             base_text = "1000"
@@ -1145,6 +1208,7 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
         await page.evaluate(js_set_multiplier)
         await page.wait_for_timeout(500)
 
+        # 4. အတည်ပြုမည်
         confirm_btn = page.locator('.Betting__Popup-foot > div').last
         await confirm_btn.click(timeout=3000, force=True)
 
@@ -1154,6 +1218,7 @@ async def place_auto_bet(page, message: types.Message, bet_type: str, amount: in
         return True
 
     except Exception as e:
+        # Error တက်ပါက Screenshot ရိုက်၍ ပို့ပေးမည်
         if not silent:
             error_image_path = f"debug_error_{message.from_user.id}.png"
             try:
@@ -1298,6 +1363,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                 if current_issue != last_betted_issue:
                     page = active_sessions[user_tg_id]["page"]
                     
+                    # --- Hit Betting Logic ---
                     hit_wait = active_sessions[user_tg_id].get("hit_wait", 0)
                     current_misses = active_sessions[user_tg_id].get("current_misses", 0)
                     
@@ -1341,6 +1407,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                         await asyncio.sleep(2)
                         continue 
 
+                    # --- အထက်ပါအဆင့်ကို ကျော်သွားမှသာ တကယ်လောင်းမည် ---
                     sequence = active_sessions[user_tg_id].get("bet_sequence", [10])
                     step = active_sessions[user_tg_id].get("current_bet_step", 0)
                     
@@ -1363,6 +1430,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                     except Exception: 
                         pass 
 
+                    # 📝 ပုံစံသစ်ဖြင့် လောင်းကြေးအချက်အလက်ကို ပြသခြင်း (Blockquote)
                     betting_msg = (
                         f"<blockquote>"
                         f"📄 WINGO_30S : {current_issue}\n"
@@ -1425,6 +1493,7 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                             else:
                                 profit_display = f"{current_profit:,.2f} Ks"
                             
+                            # 📝 ပုံစံသစ်ဖြင့် ရလဒ်ကို ပြသခြင်း (Blockquote)
                             result_msg = (
                                 f"<blockquote>"
                                 f"{status_title}\n"
@@ -1694,6 +1763,7 @@ async def logout(message: types.Message, state: FSMContext):
             except Exception as e:
                 print(f"Logout UI Click Error: {e}")
 
+        # Browser များကို ပိတ်ခြင်း
         try:
             await active_sessions[user_tg_id]["browser"].close()
             await active_sessions[user_tg_id]["playwright"].stop()
