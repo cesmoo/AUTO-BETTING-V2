@@ -1,3 +1,4 @@
+
 import asyncio
 import os
 import html
@@ -43,7 +44,7 @@ dp = Dispatcher(storage=storage)
 active_sessions = {}
 
 # ==========================================================
-# 🖼️ Dynamic Image Generator
+# 🖼️ Template Image Generator
 # ==========================================================
 def generate_login_image(
     site_name: str,
@@ -53,31 +54,77 @@ def generate_login_image(
     balance: str,
     developer: str = "@iwillgoforwardalone"
 ):
-    """Login Success Image ကို Dynamic ဆွဲပေးမယ်"""
+    """Template ပုံပေါ်မှာ User Data တွေထည့်ပြီး Image ထုတ်ပေးမယ်"""
     
-    width, height = 500, 480
+    template_path = "login_template.png"
     
-    # Background - Dark Blue
+    # Template ပုံမရှိရင် Dynamic ဆွဲပေးမယ်
+    if not os.path.exists(template_path):
+        return generate_login_image_dynamic(site_name, user_id, username, nickname, balance, developer)
+    
+    try:
+        img = Image.open(template_path)
+        draw = ImageDraw.Draw(img)
+        
+        # Font သတ်မှတ်မယ် (1333x800 အတွက်)
+        try:
+            font_value = ImageFont.truetype("arialbd.ttf", 36)
+        except:
+            try:
+                font_value = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 36)
+            except:
+                font_value = ImageFont.load_default()
+        
+        # 🎯 နေရာကွက်တိ (1333x800 အတွက်)
+        # SITE - (x=636, y=160)
+        draw.text((636, 160), site_name.upper(), fill=(255, 255, 255), font=font_value)
+        
+        # USER ID - (x=636, y=240)
+        draw.text((636, 240), user_id, fill=(255, 255, 255), font=font_value)
+        
+        # USERNAME - (x=636, y=320)
+        draw.text((636, 320), username, fill=(255, 255, 255), font=font_value)
+        
+        # BALANCE - (x=636, y=400) Green Color
+        draw.text((636, 400), f"{balance} Ks", fill=(0, 255, 100), font=font_value)
+        
+        output_path = f"login_{user_id.replace(' ', '')}.png"
+        img.save(output_path)
+        return output_path
+        
+    except Exception as e:
+        print(f"Template Error: {e}")
+        return generate_login_image_dynamic(site_name, user_id, username, nickname, balance, developer)
+
+def generate_login_image_dynamic(
+    site_name: str,
+    user_id: str,
+    username: str,
+    nickname: str,
+    balance: str,
+    developer: str = "@iwillgoforwardalone"
+):
+    """Template မရှိရင် Dynamic ဆွဲပေးမယ် (1333x800 အတွက်)"""
+    width, height = 1333, 800
+    
     img = Image.new('RGB', (width, height), color=(16, 20, 45))
     draw = ImageDraw.Draw(img)
     
-    # Border
-    draw.rectangle([(5, 5), (width-5, height-5)], outline=(50, 60, 100), width=2)
+    draw.rectangle([(10, 10), (width-10, height-10)], outline=(50, 60, 100), width=3)
     
-    # Fonts
     try:
-        font_title = ImageFont.truetype("arialbd.ttf", 26)
-        font_label = ImageFont.truetype("arial.ttf", 16)
-        font_value = ImageFont.truetype("arialbd.ttf", 18)
-        font_button = ImageFont.truetype("arialbd.ttf", 14)
-        font_small = ImageFont.truetype("arial.ttf", 12)
+        font_title = ImageFont.truetype("arialbd.ttf", 48)
+        font_label = ImageFont.truetype("arial.ttf", 30)
+        font_value = ImageFont.truetype("arialbd.ttf", 36)
+        font_button = ImageFont.truetype("arialbd.ttf", 28)
+        font_small = ImageFont.truetype("arial.ttf", 22)
     except:
         try:
-            font_title = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 26)
-            font_label = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 16)
-            font_value = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 18)
-            font_button = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 14)
-            font_small = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 12)
+            font_title = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 48)
+            font_label = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 30)
+            font_value = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 36)
+            font_button = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", 28)
+            font_small = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", 22)
         except:
             font_title = ImageFont.load_default()
             font_label = ImageFont.load_default()
@@ -85,50 +132,43 @@ def generate_login_image(
             font_button = ImageFont.load_default()
             font_small = ImageFont.load_default()
     
-    # 1. Title
+    # Title
     title = "✅ LOGIN SUCCESSFUL"
     title_bbox = draw.textbbox((0, 0), title, font=font_title)
     title_width = title_bbox[2] - title_bbox[0]
-    draw.text(((width - title_width) // 2, 25), title, fill=(0, 255, 100), font=font_title)
+    draw.text(((width - title_width) // 2, 50), title, fill=(0, 255, 100), font=font_title)
     
-    # Line 1
-    draw.line([(40, 75), (width-40, 75)], fill=(60, 70, 120), width=2)
+    draw.line([(100, 130), (width-100, 130)], fill=(60, 70, 120), width=3)
     
-    # 2. Site
-    draw.text((45, 100), "SITE", fill=(140, 150, 200), font=font_label)
-    draw.text((250, 98), site_name.upper(), fill=(255, 255, 255), font=font_value)
+    # Labels
+    draw.text((100, 170), "SITE", fill=(140, 150, 200), font=font_label)
+    draw.text((636, 160), site_name.upper(), fill=(255, 255, 255), font=font_value)
     
-    # 3. User ID
-    draw.text((45, 145), "USER ID", fill=(140, 150, 200), font=font_label)
-    draw.text((250, 143), user_id, fill=(255, 255, 255), font=font_value)
+    draw.text((100, 250), "USER ID", fill=(140, 150, 200), font=font_label)
+    draw.text((636, 240), user_id, fill=(255, 255, 255), font=font_value)
     
-    # 4. Username
-    draw.text((45, 190), "USERNAME", fill=(140, 150, 200), font=font_label)
-    draw.text((250, 188), username, fill=(255, 255, 255), font=font_value)
+    draw.text((100, 330), "USERNAME", fill=(140, 150, 200), font=font_label)
+    draw.text((636, 320), username, fill=(255, 255, 255), font=font_value)
     
-    # 5. Balance (Green)
-    draw.text((45, 235), "BALANCE", fill=(140, 150, 200), font=font_label)
-    draw.text((250, 233), f"{balance} Ks", fill=(0, 255, 100), font=font_value)
+    draw.text((100, 410), "BALANCE", fill=(140, 150, 200), font=font_label)
+    draw.text((636, 400), f"{balance} Ks", fill=(0, 255, 100), font=font_value)
     
-    # Line 2
-    draw.line([(40, 280), (width-40, 280)], fill=(60, 70, 120), width=2)
+    draw.line([(100, 480), (width-100, 480)], fill=(60, 70, 120), width=3)
     
-    # 6. Add Funds Button (Green)
-    draw.rectangle([(45, 300), (240, 345)], fill=(0, 130, 60), outline=(0, 200, 100), width=2)
-    draw.text((65, 312), "➕ Add Funds", fill=(255, 255, 255), font=font_button)
+    # Buttons
+    draw.rectangle([(150, 510), (550, 580)], fill=(0, 130, 60), outline=(0, 200, 100), width=3)
+    draw.text((220, 535), "➕ Add Funds", fill=(255, 255, 255), font=font_button)
     
-    # 7. View History Button (Blue)
-    draw.rectangle([(260, 300), (455, 345)], fill=(0, 80, 180), outline=(0, 150, 255), width=2)
-    draw.text((280, 312), "📊 View History", fill=(255, 255, 255), font=font_button)
+    draw.rectangle([(650, 510), (1050, 580)], fill=(0, 80, 180), outline=(0, 150, 255), width=3)
+    draw.text((720, 535), "📊 View History", fill=(255, 255, 255), font=font_button)
     
-    # 8. Developer
+    # Developer
     dev_text = f"Developed by {developer}"
     dev_bbox = draw.textbbox((0, 0), dev_text, font=font_small)
     dev_width = dev_bbox[2] - dev_bbox[0]
-    draw.text(((width - dev_width) // 2, 370), dev_text, fill=(80, 90, 140), font=font_small)
+    draw.text(((width - dev_width) // 2, 620), dev_text, fill=(80, 90, 140), font=font_small)
     
-    # Save
-    output_path = f"login_{user_id.replace(' ', '')}.png"
+    output_path = "login_success.png"
     img.save(output_path)
     return output_path
 
@@ -746,7 +786,7 @@ async def process_password(message: types.Message, state: FSMContext):
             await update_progress(loading_msg, 100)
             await asyncio.sleep(0.5)
             
-            # ✅ Generate Login Image
+            # ✅ Generate Login Image from Template
             try:
                 image_path = generate_login_image(
                     site_name=site_name,
@@ -793,7 +833,8 @@ async def process_password(message: types.Message, state: FSMContext):
                     f"├─ <b>Username:</b> {username}\n"
                     f"├─ <b>Nickname:</b> {nickname.strip()}\n"
                     f"├─ <b>Balance:</b> {balance_text.strip()}\n"
-                    f"└─ <b>Login Date:</b> {site_login_time}\n"
+                    f"└─ <b>Login Date:</b> {site_login_time}\n\n"
+                    f"<i>Developed by @iwillgoforwardalone</i>"
                 )
                 await message.answer(
                     login_msg,
