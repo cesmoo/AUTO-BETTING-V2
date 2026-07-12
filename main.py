@@ -1421,14 +1421,47 @@ async def logout(message: types.Message, state: FSMContext):
     await message.answer("👋 အကောင့်ထွက်ပြီးပါပြီ။", reply_markup=get_main_keyboard())
 
 
-@dp.message(F.text == "🎰 Games")
+# ============ Main Keyboard Function ============
+def get_main_keyboard():
+    """
+    Main Reply Keyboard ကို Premium emoji နဲ့ ပြန်ပေးတဲ့ function
+    """
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[
+            [
+                KeyboardButton(
+                    text="🎰 Games",  # ← ဒီစာသားက F.text == "🎰 Games" နဲ့ ကိုက်ရမယ်
+                    icon_custom_emoji_id="5228920000686131979"  # ← Premium emoji ID (သင့်ဟာနဲ့အစားထိုးပါ)
+                )
+            ],
+            [
+                KeyboardButton(
+                    text="📊 My Stats",
+                    # icon_custom_emoji_id="5228920000686131980"  # ← နောက်ထပ် Premium emoji ထည့်ချင်ရင်
+                )
+            ],
+            [
+                KeyboardButton(
+                    text="⚙️ Settings"
+                    # icon_custom_emoji_id="5228920000686131981"  # ← နောက်ထပ် Premium emoji ထည့်ချင်ရင်
+                )
+            ]
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
+    return keyboard
+
+
+# ============ Handler Function ============
+@dp.message(F.text == "🎰 Games")  # ← ဒီဟာကို မပြောင်းပါနဲ့ (ခလုတ်နဲ့ကိုက်ရမယ်)
 async def games(message: types.Message):
     await message.answer(
         "🎮 <b>Game ရွေးချယ်ရန်:</b>\nWin Go 30s ကို ရွေးချယ်ထားပါသည်။\n\n"
         "🤖 <b>Bot Commands:</b>\n"
         "<code>▶️ Start Auto-Bet</code> - ခလုတ်နှိပ်၍ Auto Bet စတင်နိုင်ပါသည်\n"
         "<code>🛑 Stop Auto-Bet</code> - ခလုတ်နှိပ်၍ Auto Bet ရပ်တန့်နိုင်ပါသည်\n",
-        reply_markup=get_main_keyboard()
+        reply_markup=get_main_keyboard()  # ← Premium emoji ပါတဲ့ keyboard ကို ခေါ်တယ်
     )
 
 # ==========================================================
