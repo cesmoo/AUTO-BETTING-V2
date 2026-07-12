@@ -62,7 +62,7 @@ TEXT_BACK = "Back"
 # Keyboard buttons with premium emojis and style
 E_INFO = KeyboardButton(
     text=TEXT_INFO, 
-    icon_custom_emoji_id="6132074050022809355",
+    icon_custom_emoji_id="5868656545634689320",
     style="primary"  # 🔵 Blue
 )
 
