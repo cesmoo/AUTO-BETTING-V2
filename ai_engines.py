@@ -41,6 +41,29 @@ class AIEmoji:
     CHART_UP = "📈"; CHART_DOWN = "📉"; STAR = "⭐"
     ROBOT = "🤖"; BRAIN = "🧠"
 
+# ==========================================================
+# 🎨 AI Mode Emoji IDs for Reply Keyboard
+# ==========================================================
+AI_MODE_EMOJIS = {
+    "🎯 Pattern AI": "6114102463747332294",
+    "🎲 Martingale AI": "6113995669385515849",
+    "🔄 Anti-Martingale AI": "6210747139237088236",
+    "📊 Trend Following": "5431577498364158238",
+    "🔢 Fibonacci AI": "5884290437459480896",
+    "🎯 Golden Ratio": "6114102463747332294",
+    "📈 Momentum AI": "5269460053651366623",
+    "🎲 Monte Carlo": "6113995669385515849",
+    "🧬 Neural Pattern": "5212936673423274058",
+    "⚡ Quick Reversal": "6210787138267515780",
+    "🌊 Wave Analysis": "5431685735835011215",
+    "🎪 Chaos Theory": "6251379582851614396",
+    "🤖 Ensemble AI": "6300674206703027915",
+    "📐 Bayesian AI": "5366380461746563803",
+    "🔗 Markov Chain": "6210879046272682741",
+    "🧪 ML Style AI": "6190369920304289234",
+    "🎡 Circle Rnd": "5226711870492126219",
+}
+
 # ==========================================
 # 1. PATTERN AI (9 Patterns Only)
 # ==========================================
@@ -444,98 +467,20 @@ def get_prediction(history_docs, mode):
     return AI_MODES["pattern"]["func"](history_docs)
 
 # ==========================================================
-# 🎨 AI Mode Emoji IDs for Reply Keyboard (xxx.py အတွက်)
+# 🎨 AI Mode Buttons for Reply Keyboard (xxxx.py အတွက်)
 # ==========================================================
 from aiogram.types import KeyboardButton
 
-AI_MODE_BUTTONS = {
-    "pattern": KeyboardButton(
-        text=AI_MODE_NAMES["pattern"],
-        icon_custom_emoji_id="5868656545634689320",
-        style="primary"
-    ),
-    "martingale": KeyboardButton(
-        text=AI_MODE_NAMES["martingale"],
-        icon_custom_emoji_id="5868108575387671725",
-        style="primary"
-    ),
-    "anti_martingale": KeyboardButton(
-        text=AI_MODE_NAMES["anti_martingale"],
-        icon_custom_emoji_id="5868665489092263539",
-        style="primary"
-    ),
-    "trend_following": KeyboardButton(
-        text=AI_MODE_NAMES["trend_following"],
-        icon_custom_emoji_id="5877652234091891383",
-        style="primary"
-    ),
-    "fibonacci": KeyboardButton(
-        text=AI_MODE_NAMES["fibonacci"],
-        icon_custom_emoji_id="5877260593903177342",
-        style="primary"
-    ),
-    "golden_ratio": KeyboardButton(
-        text=AI_MODE_NAMES["golden_ratio"],
-        icon_custom_emoji_id="5869547610204280761",
-        style="primary"
-    ),
-    "momentum": KeyboardButton(
-        text=AI_MODE_NAMES["momentum"],
-        icon_custom_emoji_id="5884248697980608904",
-        style="primary"
-    ),
-    "monte_carlo": KeyboardButton(
-        text=AI_MODE_NAMES["monte_carlo"],
-        icon_custom_emoji_id="5884041323843955199",
-        style="primary"
-    ),
-    "neural_pattern": KeyboardButton(
-        text=AI_MODE_NAMES["neural_pattern"],
-        icon_custom_emoji_id="5875180111744995604",
-        style="primary"
-    ),
-    "quick_reversal": KeyboardButton(
-        text=AI_MODE_NAMES["quick_reversal"],
-        icon_custom_emoji_id="5890997763331591703",
-        style="primary"
-    ),
-    "wave_analysis": KeyboardButton(
-        text=AI_MODE_NAMES["wave_analysis"],
-        icon_custom_emoji_id="5967574255670399788",
-        style="primary"
-    ),
-    "chaos_theory": KeyboardButton(
-        text=AI_MODE_NAMES["chaos_theory"],
-        icon_custom_emoji_id="5877443460725739250",
-        style="primary"
-    ),
-    "ensemble": KeyboardButton(
-        text=AI_MODE_NAMES["ensemble"],
-        icon_custom_emoji_id="5877652234091891383",
-        style="primary"
-    ),
-    "bayesian": KeyboardButton(
-        text=AI_MODE_NAMES["bayesian"],
-        icon_custom_emoji_id="5868656545634689320",
-        style="primary"
-    ),
-    "markov_chain": KeyboardButton(
-        text=AI_MODE_NAMES["markov_chain"],
-        icon_custom_emoji_id="5848119413041431362",
-        style="primary"
-    ),
-    "ml_style": KeyboardButton(
-        text=AI_MODE_NAMES["ml_style"],
-        icon_custom_emoji_id="5884289942371401145",
-        style="primary"
-    ),
-    "circle_rnd": KeyboardButton(
-        text=AI_MODE_NAMES["circle_rnd"],
-        icon_custom_emoji_id="5807868868886009920",
-        style="primary"
-    ),
-}
-
 def get_ai_mode_buttons():
     """Return list of all AI mode buttons for keyboard"""
-    return list(AI_MODE_BUTTONS.values())
+    buttons = []
+    for mode_key, mode_info in AI_MODES.items():
+        mode_name = mode_info["name"]
+        emoji_id = AI_MODE_EMOJIS.get(mode_name, "5868656545634689320")
+        btn = KeyboardButton(
+            text=mode_name,
+            icon_custom_emoji_id=emoji_id,
+            style="primary"
+        )
+        buttons.append(btn)
+    return buttons
