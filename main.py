@@ -26,6 +26,7 @@ from playwright.async_api import async_playwright
 # Database နှင့် AI ကို ချိတ်ဆက်ခြင်း
 import database as db 
 import ai_engines
+from ai_engines import AI_MODES, AI_MODE_EMOJIS
 
 # ==========================================================
 # ⚙️ Configuration
@@ -280,10 +281,22 @@ def get_main_keyboard():
         resize_keyboard=True
     )
 
+# ==========================================================
+# ⌨️ Site Selection Keyboard with Colors
+# ==========================================================
 def get_site_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="𝟳𝟳𝟳𝗕𝗜𝗚𝗪𝗜𝗡"), KeyboardButton(text="𝗦𝗜𝗫 𝗟𝗢𝗧𝗧𝗘𝗥𝗬")], 
+            [
+                KeyboardButton(
+                    text="𝟳𝟳𝟳𝗕𝗜𝗚𝗪𝗜𝗡",
+                    style="success"  # 🟢 Green
+                ),
+                KeyboardButton(
+                    text="𝗦𝗜𝗫 𝗟𝗢𝗧𝗧𝗘𝗥𝗬",
+                    style="danger"  # 🔴 Red
+                )
+            ],
             [E_BACK]
         ],
         resize_keyboard=True
@@ -303,17 +316,34 @@ def get_logged_in_keyboard():
     )
 
 def get_ai_mode_keyboard():
-    modes = list(ai_engines.AI_MODES.values())
+    modes = list(AI_MODES.values())
     keyboard = []
     row = []
+    
     for mode in modes:
-        row.append(KeyboardButton(text=mode["name"]))
+        mode_name = mode["name"]
+        emoji_id = AI_MODE_EMOJIS.get(mode_name, "5868656545634689320")
+        
+        btn = KeyboardButton(
+            text=mode_name,
+            icon_custom_emoji_id=emoji_id,
+            style="primary"  # 🔵 Blue color
+        )
+        row.append(btn)
         if len(row) == 2:
             keyboard.append(row)
             row = []
-    if row: 
+    if row:
         keyboard.append(row)
-    keyboard.append([KeyboardButton(text="🔙 ပင်မမီနူးသို့")])
+    
+    # Back button with premium emoji and style
+    back_btn = KeyboardButton(
+        text="🔙 ပင်မမီနူးသို့",
+        icon_custom_emoji_id="5848119413041431362",
+        style="primary"
+    )
+    keyboard.append([back_btn])
+    
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 def get_hit_betting_inline_keyboard(current_wait: int = 0):
