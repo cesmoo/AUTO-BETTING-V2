@@ -422,23 +422,23 @@ def circle_rnd_predict(history_docs):
 # ========== AI MODES DICTIONARY ==========
 # ✅ AI Mode Names with Emojis (For Reply Keyboard)
 AI_MODE_NAMES = {
-    "pattern": "🎯 Pattern AI",
-    "martingale": "🎲 Martingale AI",
-    "anti_martingale": "🔄 Anti-Martingale AI",
-    "trend_following": "📊 Trend Following",
-    "fibonacci": "🔢 Fibonacci AI",
-    "golden_ratio": "🎯 Golden Ratio",
-    "momentum": "📈 Momentum AI",
-    "monte_carlo": "🎲 Monte Carlo",
-    "neural_pattern": "🧬 Neural Pattern",
-    "quick_reversal": "⚡ Quick Reversal",
-    "wave_analysis": "🌊 Wave Analysis",
-    "chaos_theory": "🎪 Chaos Theory",
-    "ensemble": "🤖 Ensemble AI",
-    "bayesian": "📐 Bayesian AI",
-    "markov_chain": "🔗 Markov Chain",
-    "ml_style": "🧪 ML Style AI",
-    "circle_rnd": "🎡 Circle Rnd",
+    "pattern": "Pattern AI",
+    "martingale": "Martingale AI",
+    "anti_martingale": "Anti-Martingale AI",
+    "trend_following": "Trend Following",
+    "fibonacci": "Fibonacci AI",
+    "golden_ratio": "Golden Ratio",
+    "momentum": "Momentum AI",
+    "monte_carlo": "Monte Carlo",
+    "neural_pattern": "Neural Pattern",
+    "quick_reversal": "Quick Reversal",
+    "wave_analysis": "Wave Analysis",
+    "chaos_theory": "Chaos Theory",
+    "ensemble": "Ensemble AI",
+    "bayesian": "Bayesian AI",
+    "markov_chain": "Markov Chain",
+    "ml_style": "ML Style AI",
+    "circle_rnd": "Circle Rnd",
 }
 
 AI_MODES = {
@@ -476,7 +476,7 @@ def get_ai_mode_buttons():
     buttons = []
     for mode_key, mode_info in AI_MODES.items():
         mode_name = mode_info["name"]
-        emoji_id = AI_MODE_EMOJIS.get(mode_name, "5868656545634689320")
+        emoji_id = AI_MODE_EMOJIS.get(mode_name, "6300853298249336390")
         btn = KeyboardButton(
             text=mode_name,
             icon_custom_emoji_id=emoji_id,
