@@ -1,5 +1,3 @@
-[file name]: ai_engines.py
-[file content begin]
 # ai_engines.py
 import numpy as np
 import time
@@ -446,4 +444,3 @@ def get_prediction(history_docs, mode):
     mode_info = AI_MODES.get(mode)
     if mode_info: return mode_info["func"](history_docs)
     return AI_MODES["pattern"]["func"](history_docs)
-[file content end]
