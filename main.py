@@ -1,4 +1,3 @@
-
 import asyncio
 import os
 import html
@@ -42,7 +41,7 @@ dp = Dispatcher(storage=storage)
 active_sessions = {}
 
 # ==========================================================
-# 🌟 Premium Emojis for Reply Keyboard (Aiogram)
+# 🌟 Premium Emojis + Style for Reply Keyboard (Aiogram 3.x)
 # ==========================================================
 # Text constants for handlers
 TEXT_INFO = "Info"
@@ -60,21 +59,90 @@ TEXT_LOGOUT = "Logout"
 TEXT_LOGIN = "Login"
 TEXT_BACK = "Back"
 
-# Keyboard buttons with premium emojis
-E_INFO = KeyboardButton(text=TEXT_INFO, icon_custom_emoji_id="5971801057540443125")
-E_BALANCE = KeyboardButton(text=TEXT_BALANCE, icon_custom_emoji_id="5971801057540443125")
-E_STATUS = KeyboardButton(text=TEXT_STATUS, icon_custom_emoji_id="5971801057540443125")
-E_START = KeyboardButton(text=TEXT_START, icon_custom_emoji_id="5971801057540443125")
-E_STOP = KeyboardButton(text=TEXT_STOP, icon_custom_emoji_id="5971801057540443125")
-E_GAMES = KeyboardButton(text=TEXT_GAMES, icon_custom_emoji_id="5971801057540443125")
-E_AI = KeyboardButton(text=TEXT_AI, icon_custom_emoji_id="5971801057540443125")
-E_BETSIZE = KeyboardButton(text=TEXT_BETSIZE, icon_custom_emoji_id="5971801057540443125")
-E_PROFIT = KeyboardButton(text=TEXT_PROFIT, icon_custom_emoji_id="5971801057540443125")
-E_HIT = KeyboardButton(text=TEXT_HIT, icon_custom_emoji_id="5971801057540443125")
-E_PREDICT = KeyboardButton(text=TEXT_PREDICT, icon_custom_emoji_id="5971801057540443125")
-E_LOGOUT = KeyboardButton(text=TEXT_LOGOUT, icon_custom_emoji_id="5971801057540443125")
-E_LOGIN = KeyboardButton(text=TEXT_LOGIN, icon_custom_emoji_id="5971801057540443125")
-E_BACK = KeyboardButton(text=TEXT_BACK, icon_custom_emoji_id="5971801057540443125")
+# Keyboard buttons with premium emojis and style
+E_INFO = KeyboardButton(
+    text=TEXT_INFO, 
+    icon_custom_emoji_id="6132074050022809355",
+    style="primary"  # 🔵 Blue
+)
+
+E_BALANCE = KeyboardButton(
+    text=TEXT_BALANCE, 
+    icon_custom_emoji_id="5868108575387671725",
+    style="primary"  # 🔵 Blue
+)
+
+E_STATUS = KeyboardButton(
+    text=TEXT_STATUS, 
+    icon_custom_emoji_id="5877443460725739250",
+    style="primary"  # 🔵 Blue
+)
+
+E_START = KeyboardButton(
+    text=TEXT_START, 
+    icon_custom_emoji_id="5884248697980608904",
+    style="success"  # 🟢 Green
+)
+
+E_STOP = KeyboardButton(
+    text=TEXT_STOP, 
+    icon_custom_emoji_id="5884289942371401145",
+    style="danger"  # 🔴 Red
+)
+
+E_GAMES = KeyboardButton(
+    text=TEXT_GAMES, 
+    icon_custom_emoji_id="5868665489092263539",
+    style="primary"  # 🔵 Blue
+)
+
+E_AI = KeyboardButton(
+    text=TEXT_AI, 
+    icon_custom_emoji_id="5877652234091891383",
+    style="primary"  # 🔵 Blue
+)
+
+E_BETSIZE = KeyboardButton(
+    text=TEXT_BETSIZE, 
+    icon_custom_emoji_id="5877260593903177342",
+    style="primary"  # 🔵 Blue
+)
+
+E_PROFIT = KeyboardButton(
+    text=TEXT_PROFIT, 
+    icon_custom_emoji_id="5967574255670399788",
+    style="primary"  # 🔵 Blue
+)
+
+E_HIT = KeyboardButton(
+    text=TEXT_HIT, 
+    icon_custom_emoji_id="5869547610204280761",
+    style="primary"  # 🔵 Blue
+)
+
+E_PREDICT = KeyboardButton(
+    text=TEXT_PREDICT, 
+    icon_custom_emoji_id="5890997763331591703",
+    style="primary"  # 🔵 Blue
+)
+
+E_LOGOUT = KeyboardButton(
+    text=TEXT_LOGOUT, 
+    icon_custom_emoji_id="5875180111744995604",
+    style="danger"  # 🔴 Red
+)
+
+E_LOGIN = KeyboardButton(
+    text=TEXT_LOGIN, 
+    icon_custom_emoji_id="5884041323843955199",
+    style="primary"  # 🔵 Blue
+)
+
+E_BACK = KeyboardButton(
+    text=TEXT_BACK, 
+    icon_custom_emoji_id="5848119413041431362",
+    style="primary"  # 🔵 Blue
+)
 
 # Premium Emojis for Messages
 P_1 = '<tg-emoji emoji-id="5890997763331591703">⚙️</tg-emoji>'
