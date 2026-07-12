@@ -374,8 +374,21 @@ async def process_password(message: types.Message, state: FSMContext):
         main_url = "https://www.777bigwingame.app/#/main"
         game_url = "https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1"
 
-    loading_msg = await message.answer(f"{site_name} ꜱɪɢɴɪɴɢ ɪɴ... ᴘʟᴇᴀꜱᴇ ᴡᴀɪᴛ.")
+    # 📊 Progress Bar Update လုပ်ပေးမည့် Helper Function
+    async def update_progress(msg: types.Message, pct: int):
+        filled = pct // 10
+        empty = 10 - filled
+        bar = "■" * filled + "□" * empty
+        try:
+            await msg.edit_text(f"{bar} Logging in... {pct}%")
+        except Exception:
+            pass
+
+    # Initial Loading State 0%
+    loading_msg = await message.answer("□□□□□□□□□□ Logging in... 0%")
     
+    # 10% - Browser စတင်ဖွင့်ခြင်း
+    await update_progress(loading_msg, 10)
     p = await async_playwright().start()
     browser = await p.chromium.launch(headless=True, args=['--no-sandbox', '--disable-setuid-sandbox'])
     context = await browser.new_context(
@@ -386,9 +399,13 @@ async def process_password(message: types.Message, state: FSMContext):
     page = await context.new_page()
     
     try:
+        # 30% - Login စာမျက်နှာသို့ သွားခြင်း
+        await update_progress(loading_msg, 30)
         await page.goto(login_url, wait_until="networkidle", timeout=60000)
         await page.wait_for_timeout(3000)
 
+        # 50% - ဖုန်းနံပါတ်နှင့် စကားဝှက် ရိုက်ထည့်ခြင်း
+        await update_progress(loading_msg, 50)
         js_code = """
         ([user, pwd]) => {
             function fillVueInput(element, value) {
@@ -411,6 +428,8 @@ async def process_password(message: types.Message, state: FSMContext):
         await page.evaluate(js_code, [username, password])
         await page.wait_for_timeout(1000)
         
+        # 70% - Login ခလုတ်နှိပ်ခြင်း
+        await update_progress(loading_msg, 70)
         await page.evaluate("() => { let btn = document.querySelector('button.active'); if (btn) btn.click(); }")
         await page.wait_for_timeout(5000)
         
@@ -426,6 +445,8 @@ async def process_password(message: types.Message, state: FSMContext):
             pass
         
         if "login" not in page.url.lower():
+            # 85% - Main စာမျက်နှာသို့သွား၍ အချက်အလက်များယူခြင်း
+            await update_progress(loading_msg, 85)
             try:
                 await page.goto(main_url, wait_until="networkidle")
                 await page.wait_for_timeout(3000)
@@ -486,14 +507,18 @@ async def process_password(message: types.Message, state: FSMContext):
                 "current_bet_step": 0,          
                 "profit_target": 0,             
                 "start_balance": extract_balance(balance_text),
-                "session_profit": 0.0, # 👈 Profit အတိအကျမှတ်ရန်
+                "session_profit": 0.0, 
                 "hit_wait": 0,
                 "current_misses": 0,
                 "is_ai_prediction_enabled": False, 
                 "last_predicted_issue": None       
             }
 
-            await message.answer(f"𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦", reply_markup=get_logged_in_keyboard())
+            # 100% - အရာအားလုံးပြီးစီးခြင်း
+            await update_progress(loading_msg, 100)
+            await asyncio.sleep(0.5) 
+            
+            await message.answer(f"𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦 ({site_name})", reply_markup=get_logged_in_keyboard())
             await state.set_state(LoginForm.main_menu)
             
         else:
@@ -513,6 +538,12 @@ async def process_password(message: types.Message, state: FSMContext):
         await state.clear()
         await loading_msg.delete()
 
+P_1 = '<tg-emoji emoji-id="5890997763331591703">⚙️</tg-emoji>'
+P_2 = '<tg-emoji emoji-id="5875180111744995604">⚙️</tg-emoji>'
+P_3 = '<tg-emoji emoji-id="5877443460725739250">⚙️</tg-emoji>'
+P_4 = '<tg-emoji emoji-id="5967574255670399788">⚙️</tg-emoji>'
+P_5 = '<tg-emoji emoji-id="5807868868886009920">⚙️</tg-emoji>'
+P_6 = '<tg-emoji emoji-id="5807461353799030682">⚙️</tg-emoji>'
 # ==========================================================
 # 🔮 AI Prediction Mode Handlers
 # ==========================================================
@@ -573,11 +604,13 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                     long_l = active_sessions[user_tg_id].get("longest_lose_streak", 0)
                     
                     pred_msg = await message.answer(
-                        f"🔮 <b>AI Prediction (Live)</b>\n"
+                        f"<blockquote>"
+                        f"{P_1} Ai Prediction - Live\n"
                         f"━━━━━━━━━━━━━━━\n"
-                        f"• WINGO_30S : <code>{current_issue}</code>\n"
-                        f"• Prediction : <b>{predicted_bet.upper()}</b>〔 {long_w} 〕|〔 {long_l} 〕\n"
-                        f"• Status : ⏳ <b>Waiting for result...</b>"
+                        f"{P_2} WINGO_30S : <code>{current_issue}</code>\n"
+                        f"{P_3} Prediction : <b>{predicted_bet.upper()}</b>〔 {long_w} 〕|〔 {long_l} 〕\n"
+                        f"{P_4} Status : Waiting for result..."
+                        f"</blockquote>"
                     )
                     
                     actual_result = "? | ?"
@@ -592,7 +625,7 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                     if actual_result != "? | ?":
                         actual_size = actual_result.split(" | ")[1].strip().lower()
                         if predicted_bet.lower() == actual_size:
-                            status_text = f"✅ <b>WIN ({actual_result})</b>"
+                            status_text = f"{P_5}WIN{actual_result}"
                             
                             # Win တွက်ချက်မှုများ
                             active_sessions[user_tg_id]["current_win_streak"] += 1
@@ -602,7 +635,7 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                             if active_sessions[user_tg_id]["current_win_streak"] > active_sessions[user_tg_id]["longest_win_streak"]:
                                 active_sessions[user_tg_id]["longest_win_streak"] = active_sessions[user_tg_id]["current_win_streak"]
                         else:
-                            status_text = f"❌ <b>LOSE ({actual_result})</b>"
+                            status_text = f"{P_6} LOSE{actual_result}"
                             
                             # Lose တွက်ချက်မှုများ
                             active_sessions[user_tg_id]["current_lose_streak"] += 1
@@ -620,11 +653,13 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                         
                     try:
                         await pred_msg.edit_text(
-                            f"🔮 <b>AI Prediction (Live)</b>\n"
+                            f"<blockquote>"
+                            f"{P_1} Ai Prediction - Live\n"
                             f"━━━━━━━━━━━━━━━\n"
-                            f"• WINGO_30S : <code>{current_issue}</code>\n"
-                            f"• Prediction : <b>{predicted_bet.upper()}</b>〔 {new_long_w} 〕|〔 {new_long_l} 〕\n"
+                            f"{P_2} WINGO_30S : <code>{current_issue}</code>\n"
+                            f"{P_3} Prediction : <b>{predicted_bet.upper()}</b>〔 {long_w} 〕|〔 {long_l} 〕\n"
                             f"• Status : {status_text}"
+                            f"</blockquote>"
                         )
                     except Exception: 
                         pass
