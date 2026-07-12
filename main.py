@@ -1,3 +1,5 @@
+[file name]: xxx.py
+[file content begin]
 import asyncio
 import os
 import html
@@ -39,6 +41,24 @@ storage = MemoryStorage()
 dp = Dispatcher(storage=storage)
 
 active_sessions = {}
+
+# ==========================================================
+# 🌟 Premium Emojis for Keyboard
+# ==========================================================
+E_INFO = '<tg-emoji emoji-id="5971801057540443125">ℹ️</tg-emoji>'
+E_BALANCE = '<tg-emoji emoji-id="5971801057540443125">💰</tg-emoji>'
+E_STATUS = '<tg-emoji emoji-id="5971801057540443125">📊</tg-emoji>'
+E_START = '<tg-emoji emoji-id="5971801057540443125">▶️</tg-emoji>'
+E_STOP = '<tg-emoji emoji-id="5971801057540443125">🛑</tg-emoji>'
+E_GAMES = '<tg-emoji emoji-id="5971801057540443125">🎰</tg-emoji>'
+E_AI = '<tg-emoji emoji-id="5971801057540443125">🤖</tg-emoji>'
+E_BETSIZE = '<tg-emoji emoji-id="5971801057540443125">⚙️</tg-emoji>'
+E_PROFIT = '<tg-emoji emoji-id="5971801057540443125">🎯</tg-emoji>'
+E_HIT = '<tg-emoji emoji-id="5971801057540443125">🎯</tg-emoji>'
+E_PREDICT = '<tg-emoji emoji-id="5971801057540443125">🔮</tg-emoji>'
+E_LOGOUT = '<tg-emoji emoji-id="5971801057540443125">🔐</tg-emoji>'
+E_LOGIN = '<tg-emoji emoji-id="5971801057540443125">🔐</tg-emoji>'
+E_BACK = '<tg-emoji emoji-id="5971801057540443125">🔙</tg-emoji>'
 
 # ==========================================================
 # 🛠️ Helper Functions
@@ -162,8 +182,8 @@ class LoginForm(StatesGroup):
 def get_main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="🔐 Login")], 
-            [KeyboardButton(text="🎰 Games")]
+            [KeyboardButton(text=f"{E_LOGIN} Login")], 
+            [KeyboardButton(text=f"{E_GAMES} Games")]
         ],
         resize_keyboard=True
     )
@@ -172,7 +192,7 @@ def get_site_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="𝟳𝟳𝟳𝗕𝗜𝗚𝗪𝗜𝗡"), KeyboardButton(text="𝗦𝗜𝗫 𝗟𝗢𝗧𝗧𝗘𝗥𝗬")], 
-            [KeyboardButton(text="🔙 နောက်သို့")]
+            [KeyboardButton(text=f"{E_BACK} နောက်သို့")]
         ],
         resize_keyboard=True
     )
@@ -180,12 +200,12 @@ def get_site_keyboard():
 def get_logged_in_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="📋 Info"), KeyboardButton(text="💰 Balance"), KeyboardButton(text="📊 Status")], 
-            [KeyboardButton(text="▶️ Start Auto-Bet"), KeyboardButton(text="🛑 Stop Auto-Bet")],
-            [KeyboardButton(text="🎰 Games"), KeyboardButton(text="🤖 AI Mode")],
-            [KeyboardButton(text="⚙️ Set Bet-Size"), KeyboardButton(text="🎯 Profit Target")], 
-            [KeyboardButton(text="🎯 Hit Betting"), KeyboardButton(text="🔮 AI Prediction")],
-            [KeyboardButton(text="🔐 Logout")]
+            [KeyboardButton(text=f"{E_INFO} Info"), KeyboardButton(text=f"{E_BALANCE} Balance"), KeyboardButton(text=f"{E_STATUS} Status")], 
+            [KeyboardButton(text=f"{E_START} Start Auto-Bet"), KeyboardButton(text=f"{E_STOP} Stop Auto-Bet")],
+            [KeyboardButton(text=f"{E_GAMES} Games"), KeyboardButton(text=f"{E_AI} AI Mode")],
+            [KeyboardButton(text=f"{E_BETSIZE} Set Bet-Size"), KeyboardButton(text=f"{E_PROFIT} Profit Target")], 
+            [KeyboardButton(text=f"{E_HIT} Hit Betting"), KeyboardButton(text=f"{E_PREDICT} AI Prediction")],
+            [KeyboardButton(text=f"{E_LOGOUT} Logout")]
         ],
         resize_keyboard=True
     )
@@ -201,7 +221,7 @@ def get_ai_mode_keyboard():
             row = []
     if row: 
         keyboard.append(row)
-    keyboard.append([KeyboardButton(text="🔙 ပင်မမီနူးသို့")])
+    keyboard.append([KeyboardButton(text=f"{E_BACK} ပင်မမီနူးသို့")])
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 def get_hit_betting_inline_keyboard(current_wait: int = 0):
@@ -235,6 +255,12 @@ def get_ai_prediction_toggle_keyboard(is_enabled: bool):
     else:
         btn = InlineKeyboardButton(text="🔴 Disabled", callback_data="toggle_aipred", style="danger")
     return InlineKeyboardMarkup(inline_keyboard=[[btn]])
+
+def get_cancel_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="Cancel")]], 
+        resize_keyboard=True
+    )
 
 # ==========================================================
 # 👑 Owner Commands (.key & .add)
@@ -334,14 +360,14 @@ async def cmd_start(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("ᴄʟɪᴄᴋ ᴛᴏ ʟᴏɢɪɴ", reply_markup=get_main_keyboard())
 
-@dp.message(F.text == "🔐 Login")
+@dp.message(F.text == f"{E_LOGIN} Login")
 async def login_start(message: types.Message, state: FSMContext):
     await state.set_state(LoginForm.select_site)
     await message.answer("ᴘʟᴇᴀꜱᴇ ꜱᴇʟᴇᴄᴛ ᴀ ꜱɪᴛᴇ ᴛᴏ ʟᴏɢɪɴ", reply_markup=get_site_keyboard())
 
 @dp.message(LoginForm.select_site)
 async def process_site(message: types.Message, state: FSMContext):
-    if message.text == "🔙 နောက်သို့":
+    if message.text == f"{E_BACK} နောက်သို့":
         await state.clear()
         return await message.answer("Cancelled.", reply_markup=get_main_keyboard())
     await state.update_data(site=message.text)
@@ -544,10 +570,11 @@ P_3 = '<tg-emoji emoji-id="5877443460725739250">⚙️</tg-emoji>'
 P_4 = '<tg-emoji emoji-id="5967574255670399788">⚙️</tg-emoji>'
 P_5 = '<tg-emoji emoji-id="5807868868886009920">⚙️</tg-emoji>'
 P_6 = '<tg-emoji emoji-id="5807461353799030682">⚙️</tg-emoji>'
+
 # ==========================================================
 # 🔮 AI Prediction Mode Handlers
 # ==========================================================
-@dp.message(F.text == "🔮 AI Prediction")
+@dp.message(F.text == f"{E_PREDICT} AI Prediction")
 async def btn_ai_prediction_toggle(message: types.Message):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: 
@@ -658,7 +685,7 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
                             f"━━━━━━━━━━━━━━━\n"
                             f"{P_2} WINGO_30S : <code>{current_issue}</code>\n"
                             f"{P_3} Prediction : <b>{predicted_bet.upper()}</b>〔 {long_w} 〕|〔 {long_l} 〕\n"
-                            f"• Status : {status_text}"
+                            f"{P_4} Status : {status_text}"
                             f"</blockquote>"
                         )
                     except Exception: 
@@ -676,12 +703,10 @@ async def prediction_broadcast_loop(user_tg_id, message: types.Message):
         except Exception: 
             await asyncio.sleep(5)
 
-
-
 # ==========================================================
 # 🎯 Feature Handlers (Hit, Profit, AI Mode)
 # ==========================================================
-@dp.message(F.text == "🎯 Hit Betting")
+@dp.message(F.text == f"{E_HIT} Hit Betting")
 async def btn_hit_betting(message: types.Message):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: 
@@ -709,7 +734,7 @@ async def process_hit_bet(callback: types.CallbackQuery):
     else: 
         await callback.answer("❌ Hit Betting စနစ်ကို ပိတ်လိုက်ပါပြီ။", show_alert=True)
 
-@dp.message(F.text == "🎯 Profit Target")
+@dp.message(F.text == f"{E_PROFIT} Profit Target")
 async def btn_set_profit_target(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: 
@@ -720,7 +745,7 @@ async def btn_set_profit_target(message: types.Message, state: FSMContext):
     await message.answer(
         f"🎯 <b>Auto Bet အမြတ် (Profit Target) ကို သတ်မှတ်ပါ။</b>\n"
         f"လက်ရှိ သတ်မှတ်ထားသော Target: <b>{current_target} Ks</b>", 
-        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Cancel")]], resize_keyboard=True)
+        reply_markup=get_cancel_keyboard()
     )
 
 @dp.message(LoginForm.enter_profit_target)
@@ -744,7 +769,7 @@ async def process_profit_target(message: types.Message, state: FSMContext):
     else: 
         await message.answer("✅ <b>Profit Target စနစ်ကို ပိတ်လိုက်ပါပြီ။</b>", reply_markup=get_logged_in_keyboard())
 
-@dp.message(F.text == "🤖 AI Mode")
+@dp.message(F.text == f"{E_AI} AI Mode")
 async def cmd_ai_mode(message: types.Message):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: 
@@ -763,7 +788,7 @@ async def set_ai_mode(message: types.Message):
     await db.update_user_ai_mode(user_tg_id, message.text)
     await message.answer(f"✅ AI စနစ်ကို <b>{message.text}</b> သို့ ပြောင်းလဲသတ်မှတ်လိုက်ပါပြီ။", reply_markup=get_logged_in_keyboard())
 
-@dp.message(F.text == "🔙 ပင်မမီနူးသို့")
+@dp.message(F.text == f"{E_BACK} ပင်မမီနူးသို့")
 async def back_to_main(message: types.Message):
     await message.answer("ပင်မမီနူးသို့ ရောက်ရှိပါပြီ။", reply_markup=get_logged_in_keyboard())
 
@@ -980,17 +1005,6 @@ async def get_ai_prediction(user_tg_id):
         return None, 0, None, None
 
 # ==========================================================
-# 🌟 Premium Emojis Variables
-#===========================================================
-E_SETTING = '<tg-emoji emoji-id="5877260593903177342">⚙️</tg-emoji>'
-E_CROWN   = '<tg-emoji emoji-id="5807868868886009920">👑</tg-emoji>'
-E_LOSS    = '<tg-emoji emoji-id="5807461353799030682">💸</tg-emoji>'
-E_GRID    = '<tg-emoji emoji-id="5884290437459480896">🔠</tg-emoji>'
-E_EDIT    = '<tg-emoji emoji-id="5985774024968379294">📝</tg-emoji>'
-E_DOC     = '<tg-emoji emoji-id="5956561916573782596">📄</tg-emoji>'
-E_FLOWER  = '<tg-emoji emoji-id="5967574255670399788">🌸</tg-emoji>'
-
-# ==========================================================
 # 🔄 Continuous Auto Bet Loop Task 
 # ==========================================================
 async def auto_bet_loop(user_tg_id, message: types.Message):
@@ -1077,9 +1091,9 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                     # 📝 ပုံစံသစ်ဖြင့် လောင်းကြေးအချက်အလက်ကို ပြသခြင်း (Blockquote)
                     betting_msg = (
                         f"<blockquote>"
-                        f"{E_DOC} WINGO_30S : {current_issue}\n"
-                        f"{E_DOC} Series : Ai Prediction\n"
-                        f"{E_FLOWER} Pred : {predicted_bet.upper()} | {current_amount} Ks"
+                        f"📄 WINGO_30S : {current_issue}\n"
+                        f"📄 Series : Ai Prediction\n"
+                        f"🌸 Pred : {predicted_bet.upper()} | {current_amount} Ks"
                         f"</blockquote>"
                     )
                     await message.answer(betting_msg)
@@ -1116,16 +1130,16 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                             
                             if predicted_size == actual_size:
                                 profit_amount = current_amount * 0.96
-                                status_title = f"{E_SETTING} <b>WIN</b> {E_CROWN} +{profit_amount:.2f} Ks"
+                                status_title = f"⚙️ <b>WIN</b> 👑 +{profit_amount:.2f} Ks"
                                 active_sessions[user_tg_id]["session_profit"] += profit_amount
                                 active_sessions[user_tg_id]["current_bet_step"] = 0 
                                 active_sessions[user_tg_id]["current_misses"] = 0 
                                 
                             elif actual_size == "?": 
-                                status_title = f"{E_SETTING} <b>DRAW</b> (Pending)"
+                                status_title = f"⚙️ <b>DRAW</b> (Pending)"
                                 
                             else:
-                                status_title = f"{E_SETTING} <b>LOSE</b> {E_LOSS} {current_amount:.2f} Ks"
+                                status_title = f"⚙️ <b>LOSE</b> 💸 {current_amount:.2f} Ks"
                                 active_sessions[user_tg_id]["session_profit"] -= current_amount
                                 active_sessions[user_tg_id]["current_bet_step"] += 1
                                 if active_sessions[user_tg_id]["current_bet_step"] >= len(sequence): 
@@ -1142,10 +1156,10 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
                                 f"<blockquote>"
                                 f"{status_title}\n"
                                 f"──────────────────\n"
-                                f"{E_GRID} WINGO_30S : {current_issue}\n"
-                                f"{E_GRID} Result : {actual_result}\n"
-                                f"{E_EDIT} Balance : K{new_bal_val:,.2f}\n"
-                                f"{E_EDIT} Total Profit : {profit_display}"
+                                f"🔠 WINGO_30S : {current_issue}\n"
+                                f"🔠 Result : {actual_result}\n"
+                                f"📝 Balance : K{new_bal_val:,.2f}\n"
+                                f"📝 Total Profit : {profit_display}"
                                 f"</blockquote>"
                             )
                             await message.answer(result_msg)
@@ -1179,11 +1193,10 @@ async def auto_bet_loop(user_tg_id, message: types.Message):
             print(f"Auto Loop Error: {e}")
             await asyncio.sleep(5)
 
-
 # ==========================================================
 # ⚙️ Set Bet-Size Handlers
 # ==========================================================
-@dp.message(F.text == "⚙️ Set Bet-Size")
+@dp.message(F.text == f"{E_BETSIZE} Set Bet-Size")
 async def btn_set_betsize(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: 
@@ -1198,7 +1211,7 @@ async def btn_set_betsize(message: types.Message, state: FSMContext):
         f"လက်ရှိ သတ်မှတ်ထားသော ပမာဏ: <code>{seq_str}</code>\n\n"
         f"<b>Format:</b> 10-20-40-80 (သို့) 100-200-400\n"
         f"ကျေးဇူးပြု၍ မိမိလိုချင်သော ပမာဏကို (-) ခြား၍ ရိုက်ထည့်ပါ။ မပြောင်းလဲလိုပါက 'Cancel' ဟုရိုက်ပါ။",
-        reply_markup=ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Cancel")]], resize_keyboard=True)
+        reply_markup=get_cancel_keyboard()
     )
 
 @dp.message(LoginForm.enter_bet_sequence)
@@ -1230,7 +1243,7 @@ async def process_bet_sequence(message: types.Message, state: FSMContext):
 # ==========================================================
 # 🤖 Reply Keyboard Auto Bet & Status Handlers
 # ==========================================================
-@dp.message(F.text == "▶️ Start Auto-Bet")
+@dp.message(F.text == f"{E_START} Start Auto-Bet")
 async def btn_start_auto(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: 
@@ -1255,7 +1268,7 @@ async def btn_start_auto(message: types.Message, state: FSMContext):
     active_sessions[user_tg_id]["is_auto_betting"] = True
     asyncio.create_task(auto_bet_loop(user_tg_id, message))
 
-@dp.message(F.text == "🛑 Stop Auto-Bet")
+@dp.message(F.text == f"{E_STOP} Stop Auto-Bet")
 async def btn_stop_auto(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: 
@@ -1264,7 +1277,7 @@ async def btn_stop_auto(message: types.Message, state: FSMContext):
     active_sessions[user_tg_id]["is_auto_betting"] = False
     await message.answer("🛑 <b>ဆက်တိုက် Auto Bet စနစ်ကို ရပ်တန့်လိုက်ပါပြီ။</b>")
 
-@dp.message(F.text == "📊 Status")
+@dp.message(F.text == f"{E_STATUS} Status")
 async def btn_status(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: 
@@ -1323,7 +1336,7 @@ async def btn_status(message: types.Message, state: FSMContext):
 # ==========================================================
 # 💰 Check Balance & Other Handlers
 # ==========================================================
-@dp.message(LoginForm.main_menu, F.text == "💰 Balance")
+@dp.message(LoginForm.main_menu, F.text == f"{E_BALANCE} Balance")
 async def check_balance(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
     if user_tg_id not in active_sessions: 
@@ -1347,7 +1360,7 @@ async def check_balance(message: types.Message, state: FSMContext):
         await loading_msg.delete()
         await message.answer(f"⚠️ <b>Error:</b> Balance စစ်ဆေးရာတွင် အခက်အခဲရှိနေပါသည်။", reply_markup=get_logged_in_keyboard())
 
-@dp.message(LoginForm.main_menu, F.text == "📋 Info")
+@dp.message(LoginForm.main_menu, F.text == f"{E_INFO} Info")
 async def show_info(message: types.Message, state: FSMContext):
     data = await state.get_data()
     
@@ -1377,7 +1390,7 @@ async def show_info(message: types.Message, state: FSMContext):
     )
     await message.answer(info_text, reply_markup=get_logged_in_keyboard())
 
-@dp.message(LoginForm.main_menu, F.text == "🔐 Logout")
+@dp.message(LoginForm.main_menu, F.text == f"{E_LOGOUT} Logout")
 async def logout(message: types.Message, state: FSMContext):
     user_tg_id = message.from_user.id
     if user_tg_id in active_sessions:
@@ -1420,49 +1433,14 @@ async def logout(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("👋 အကောင့်ထွက်ပြီးပါပြီ။", reply_markup=get_main_keyboard())
 
-
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-
-# ============ Main Keyboard Function (Premium emoji ထည့်ပြီး) ============
-def get_main_keyboard():
-    """
-    Main Reply Keyboard ကို Premium emoji နဲ့ ပြန်ပေးတဲ့ function
-    """
-    keyboard = ReplyKeyboardMarkup(
-        keyboard=[
-            [
-                KeyboardButton(
-                    text="Games",  # ← ဒီစာသားက F.text == "🎰 Games" နဲ့ ကိုက်ရမယ်
-                    icon_custom_emoji_id="6300961484180556340"  # ← Premium emoji ID (သင့်ဟာနဲ့အစားထိုးပါ)
-                )
-            ],
-            [
-                KeyboardButton(
-                    text="▶️ Start Auto-Bet",
-                    # icon_custom_emoji_id="YOUR_EMOJI_ID_HERE"  # ← နောက်ထပ် Premium emoji ထည့်ချင်ရင်
-                )
-            ],
-            [
-                KeyboardButton(
-                    text="🛑 Stop Auto-Bet",
-                    # icon_custom_emoji_id="YOUR_EMOJI_ID_HERE"  # ← နောက်ထပ် Premium emoji ထည့်ချင်ရင်
-                )
-            ]
-        ],
-        resize_keyboard=True
-    )
-    return keyboard
-
-
-# ============ Handler Function (မပြောင်းဘူး) ============
-@dp.message(F.text == "Games")  # ← ဒီဟာကို မပြောင်းပါနဲ့
+@dp.message(F.text == f"{E_GAMES} Games")
 async def games(message: types.Message):
     await message.answer(
         "🎮 <b>Game ရွေးချယ်ရန်:</b>\nWin Go 30s ကို ရွေးချယ်ထားပါသည်။\n\n"
         "🤖 <b>Bot Commands:</b>\n"
-        "<code>▶️ Start Auto-Bet</code> - ခလုတ်နှိပ်၍ Auto Bet စတင်နိုင်ပါသည်\n"
-        "<code>🛑 Stop Auto-Bet</code> - ခလုတ်နှိပ်၍ Auto Bet ရပ်တန့်နိုင်ပါသည်\n",
-        reply_markup=get_main_keyboard()  # ← Premium emoji ပါတဲ့ keyboard ကို ခေါ်တယ်
+        f"<code>{E_START} Start Auto-Bet</code> - ခလုတ်နှိပ်၍ Auto Bet စတင်နိုင်ပါသည်\n"
+        f"<code>{E_STOP} Stop Auto-Bet</code> - ခလုတ်နှိပ်၍ Auto Bet ရပ်တန့်နိုင်ပါသည်\n",
+        reply_markup=get_main_keyboard()
     )
 
 # ==========================================================
@@ -1478,3 +1456,4 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Bot ကို ရပ်တန့်လိုက်ပါသည်။")
+[file content end]
