@@ -420,25 +420,25 @@ def circle_rnd_predict(history_docs):
     return predicted, f"{P_AI_STAR} {predicted} ({'အကြီး' if predicted == 'BIG' else 'အသေး'}) {emoji}", confidence, f"🎡 Circle Rnd: Spinner"
 
 # ========== AI MODES DICTIONARY ==========
-# ✅ AI Mode Names with Emojis (For Reply Keyboard)
+# ✅ AI Mode Names without regular emojis (Premium emoji က icon_custom_emoji_id ကနေပါမယ်)
 AI_MODE_NAMES = {
-    "pattern": "🎯 Pattern AI",
-    "martingale": "🎲 Martingale AI",
-    "anti_martingale": "🔄 Anti-Martingale AI",
-    "trend_following": "📊 Trend Following",
-    "fibonacci": "🔢 Fibonacci AI",
-    "golden_ratio": "🎯 Golden Ratio",
-    "momentum": "📈 Momentum AI",
-    "monte_carlo": "🎲 Monte Carlo",
-    "neural_pattern": "🧬 Neural Pattern",
-    "quick_reversal": "⚡ Quick Reversal",
-    "wave_analysis": "🌊 Wave Analysis",
-    "chaos_theory": "🎪 Chaos Theory",
-    "ensemble": "🤖 Ensemble AI",
-    "bayesian": "📐 Bayesian AI",
-    "markov_chain": "🔗 Markov Chain",
-    "ml_style": "🧪 ML Style AI",
-    "circle_rnd": "🎡 Circle Rnd",
+    "pattern": "Pattern AI",
+    "martingale": "Martingale AI",
+    "anti_martingale": "Anti-Martingale AI",
+    "trend_following": "Trend Following",
+    "fibonacci": "Fibonacci AI",
+    "golden_ratio": "Golden Ratio",
+    "momentum": "Momentum AI",
+    "monte_carlo": "Monte Carlo",
+    "neural_pattern": "Neural Pattern",
+    "quick_reversal": "Quick Reversal",
+    "wave_analysis": "Wave Analysis",
+    "chaos_theory": "Chaos Theory",
+    "ensemble": "Ensemble AI",
+    "bayesian": "Bayesian AI",
+    "markov_chain": "Markov Chain",
+    "ml_style": "ML Style AI",
+    "circle_rnd": "Circle Rnd",
 }
 
 AI_MODES = {
