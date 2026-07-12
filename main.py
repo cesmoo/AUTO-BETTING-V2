@@ -1455,4 +1455,3 @@ if __name__ == '__main__':
         asyncio.run(main())
     except KeyboardInterrupt:
         print("Bot ကို ရပ်တန့်လိုက်ပါသည်။")
-[file content end]
