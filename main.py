@@ -666,55 +666,62 @@ async def process_password(message: types.Message, state: FSMContext):
             await update_progress(loading_msg, 100)
             await asyncio.sleep(0.5) 
             
-            # --- 🎨 Generate Custom Image using Playwright (Light Pink Pill UI) ---
+            # --- 🎨 Generate Custom Image (1333x800px Perfect Fit UI) ---
             html_card = f"""
             <!DOCTYPE html>
             <html>
             <head>
             <meta charset="UTF-8">
+            <meta name="viewport" content="width=1333, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
             <style>
                 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800;900&display=swap');
                 
                 * {{
                     box-sizing: border-box;
                 }}
-                body {{
+                html, body {{
                     margin: 0;
                     padding: 0;
                     width: 1333px;
                     height: 800px;
+                    overflow: hidden; /* ပိုနေတဲ့အပိုင်းတွေ မပေါ်အောင် ပိတ်ထားမည် */
+                }}
+                body {{
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    /* ပုံပါအတိုင်း ပန်းနုရောင် နောက်ခံ */
                     background: radial-gradient(circle at top left, #fff, #fdeaf0);
                     font-family: 'Montserrat', sans-serif;
                 }}
                 .container {{
                     width: 1100px;
+                    height: 720px; /* အမြင့်ကို 1333x800 ဘောင်အတွင်း ကန့်သတ်ထားမည် */
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
                 }}
                 
                 /* --- Header Section --- */
                 .header {{
                     display: flex;
                     align-items: center;
-                    margin-bottom: 40px;
+                    margin-bottom: 25px;
                     padding-left: 10px;
                 }}
                 .check-icon {{
-                    width: 90px;
-                    height: 90px;
+                    width: 75px;
+                    height: 75px;
                     background-color: #ffffff;
                     border-radius: 50%;
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    margin-right: 30px;
-                    box-shadow: 0 15px 25px rgba(240, 160, 180, 0.3);
+                    margin-right: 25px;
+                    box-shadow: 0 10px 20px rgba(240, 160, 180, 0.4);
                 }}
                 .check-icon svg {{
-                    width: 50px;
-                    height: 50px;
+                    width: 40px;
+                    height: 40px;
                     fill: none;
                     stroke: #f28b9f;
                     stroke-width: 5;
@@ -722,7 +729,7 @@ async def process_password(message: types.Message, state: FSMContext):
                     stroke-linejoin: round;
                 }}
                 .title {{
-                    font-size: 55px;
+                    font-size: 45px;
                     font-weight: 900;
                     color: #333333;
                     letter-spacing: 2px;
@@ -731,61 +738,60 @@ async def process_password(message: types.Message, state: FSMContext):
                 /* --- Data Rows Section --- */
                 .data-row {{
                     background: #ffffff;
-                    border-radius: 25px;
-                    padding: 25px 40px;
-                    margin-bottom: 25px;
+                    border-radius: 20px;
+                    padding: 18px 35px;
+                    margin-bottom: 18px; /* ကွက်လပ်များကို လျှော့ချထားသည် */
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    /* ဘယ်ဘက်က ပန်းရောင်လိုင်းလေးနဲ့ အရိပ် */
-                    box-shadow: -10px 0 0 #fcb1c4, 0 12px 25px rgba(250, 190, 205, 0.4);
+                    box-shadow: -8px 0 0 #fcb1c4, 0 8px 20px rgba(250, 190, 205, 0.3);
                 }}
                 .info-group {{
                     display: flex;
                     flex-direction: column;
                 }}
                 .label {{
-                    font-size: 18px;
+                    font-size: 15px;
                     font-weight: 800;
-                    color: #111111;
+                    color: #555555;
                     text-transform: uppercase;
                     margin-bottom: 5px;
                 }}
                 .value {{
-                    font-size: 42px;
+                    font-size: 34px;
                     font-weight: 900;
-                    color: #000000;
+                    color: #111111;
                 }}
                 
                 /* --- Icons & Buttons --- */
                 .right-group {{
                     display: flex;
                     align-items: center;
-                    gap: 20px;
+                    gap: 15px;
                 }}
                 .circle-icon {{
-                    width: 65px;
-                    height: 65px;
+                    width: 55px;
+                    height: 55px;
                     background: #ffe6ec;
                     border-radius: 50%;
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    box-shadow: inset 0 3px 6px rgba(0,0,0,0.03);
+                    box-shadow: inset 0 2px 5px rgba(0,0,0,0.03);
                 }}
                 .circle-icon svg {{
-                    width: 32px;
-                    height: 32px;
+                    width: 28px;
+                    height: 28px;
                     fill: #111111;
                 }}
                 .btn {{
-                    padding: 18px 35px;
-                    border-radius: 35px;
-                    font-size: 20px;
+                    padding: 14px 28px;
+                    border-radius: 25px;
+                    font-size: 16px;
                     font-weight: 800;
                     color: white;
                     border: none;
-                    box-shadow: 0 6px 15px rgba(0,0,0,0.15);
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
                 }}
                 .btn-add {{
                     background: linear-gradient(90deg, #f76b7e, #e84a5f);
@@ -797,16 +803,16 @@ async def process_password(message: types.Message, state: FSMContext):
                 /* --- Footer Section --- */
                 .footer {{
                     text-align: center;
-                    margin-top: 50px;
+                    margin-top: 25px;
                 }}
                 .footer-badge {{
                     display: inline-block;
-                    padding: 15px 40px;
-                    border: 3px solid #f29bb0;
-                    border-radius: 40px;
-                    font-size: 24px;
-                    font-weight: 600;
-                    color: #222222;
+                    padding: 10px 30px;
+                    border: 2px solid #f29bb0;
+                    border-radius: 30px;
+                    font-size: 18px;
+                    font-weight: 800;
+                    color: #333333;
                     background: transparent;
                 }}
             </style>
@@ -814,7 +820,6 @@ async def process_password(message: types.Message, state: FSMContext):
             <body>
                 <div class="container" id="login-card">
                     
-                    <!-- Header -->
                     <div class="header">
                         <div class="check-icon">
                             <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -822,7 +827,6 @@ async def process_password(message: types.Message, state: FSMContext):
                         <div class="title">LOGIN SUCCESSFUL</div>
                     </div>
 
-                    <!-- Row 1: Site -->
                     <div class="data-row">
                         <div class="info-group">
                             <div class="label">SITE</div>
@@ -835,7 +839,6 @@ async def process_password(message: types.Message, state: FSMContext):
                         </div>
                     </div>
 
-                    <!-- Row 2: User ID -->
                     <div class="data-row">
                         <div class="info-group">
                             <div class="label">USER ID</div>
@@ -848,7 +851,6 @@ async def process_password(message: types.Message, state: FSMContext):
                         </div>
                     </div>
 
-                    <!-- Row 3: Username -->
                     <div class="data-row">
                         <div class="info-group">
                             <div class="label">USERNAME</div>
@@ -861,7 +863,6 @@ async def process_password(message: types.Message, state: FSMContext):
                         </div>
                     </div>
 
-                    <!-- Row 4: Balance + Buttons -->
                     <div class="data-row">
                         <div class="info-group">
                             <div class="label">BALANCE</div>
@@ -870,13 +871,12 @@ async def process_password(message: types.Message, state: FSMContext):
                         <div class="right-group">
                             <button class="btn btn-add">Add Funds</button>
                             <button class="btn btn-history">View History</button>
-                            <div class="circle-icon" style="margin-left:10px;">
+                            <div class="circle-icon" style="margin-left:5px;">
                                 <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.64-2.1 1.64-1.54 0-2.21-.86-2.27-1.84h-1.73c.1 1.79 1.32 2.92 3 3.26V20h1.86v-1.6c1.55-.26 2.89-1.3 2.89-2.97 0-2.12-1.63-2.82-3.66-3.29z"/></svg>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Footer -->
                     <div class="footer">
                         <div class="footer-badge">Developed by @iwillgoforwardalone</div>
                     </div>
@@ -889,19 +889,18 @@ async def process_password(message: types.Message, state: FSMContext):
             img_path = f"login_success_{user_tg_id}.png"
             temp_page = await context.new_page()
             
-            # 🖼️ Viewport ကို 1333x800 သတ်မှတ်ခြင်း
             await temp_page.set_viewport_size({"width": 1333, "height": 800})
             
             await temp_page.set_content(html_card)
             await temp_page.wait_for_timeout(1000) 
             
-            # Background Gradient အပြည့်ပါစေရန် clip သုံး၍ Screenshot ရိုက်ခြင်း
             await temp_page.screenshot(
                 path=img_path, 
                 omit_background=False, 
                 clip={"x": 0, "y": 0, "width": 1333, "height": 800}
             )
             await temp_page.close()
+
 
 
 
