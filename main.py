@@ -666,208 +666,215 @@ async def process_password(message: types.Message, state: FSMContext):
             await update_progress(loading_msg, 100)
             await asyncio.sleep(0.5) 
             
-            # --- 🎨 Generate Custom Image using Playwright (Advanced Design) ---
+            # --- 🎨 Generate Custom Image (5120x3072px Transparent / အကြည် Version) ---
             html_card = f"""
             <!DOCTYPE html>
             <html>
             <head>
             <meta charset="UTF-8">
             <style>
-                @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap');
+                @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800;900&display=swap');
                 
+                * {{
+                    box-sizing: border-box;
+                }}
                 body {{
-                    background: linear-gradient(135deg, #fff0f5 0%, #ffe4e1 100%);
-                    font-family: 'Montserrat', sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    width: 5120px;
+                    height: 3072px;
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    height: 100vh;
-                    margin: 0;
-                    padding: 0;
+                    /* နောက်ခံအကြည် (Transparent) ဖြစ်စေရန် */
+                    background: transparent; 
+                    font-family: 'Montserrat', sans-serif;
                 }}
-                .card-container {{
-                    /* 1333x800px အတွက် အချိုးအစား ချိန်ညှိခြင်း */
-                    width: 1200px; /* စခရင်အပြည့်နီးပါးယူရန် */
-                    padding: 50px;
-                    background: transparent;
+                .container {{
+                    width: 4200px;
                 }}
-                .header-container {{
+                
+                /* --- Header Section --- */
+                .header {{
                     display: flex;
                     align-items: center;
-                    margin-bottom: 40px;
+                    margin-bottom: 150px;
+                    padding-left: 30px;
                 }}
-                .check-circle {{
-                    width: 100px; /* Icon ကြီးရန် */
-                    height: 100px;
-                    background: #ffffff;
+                .check-icon {{
+                    width: 350px;
+                    height: 350px;
+                    background-color: #ffffff;
                     border-radius: 50%;
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    box-shadow: 0 15px 30px rgba(255, 182, 193, 0.4), inset 0 -5px 15px rgba(0,0,0,0.05);
-                    margin-right: 30px;
+                    margin-right: 100px;
+                    box-shadow: 0 50px 100px rgba(240, 160, 180, 0.4);
                 }}
-                .check-circle svg {{
-                    width: 60px;
-                    height: 60px;
-                    fill: #ef8b9e;
+                .check-icon svg {{
+                    width: 180px;
+                    height: 180px;
+                    fill: none;
+                    stroke: #f28b9f;
+                    stroke-width: 15;
+                    stroke-linecap: round;
+                    stroke-linejoin: round;
                 }}
-                .header-text {{
-                    font-size: 50px; /* စာလုံးကြီးရန် */
-                    font-weight: 800;
-                    color: #333;
-                    letter-spacing: 2px;
+                .title {{
+                    font-size: 210px;
+                    font-weight: 900;
+                    color: #333333;
+                    letter-spacing: 5px;
                 }}
-                
-                /* Layout ကို Grid သုံးပြီး (ဘယ်-ညာ) ခွဲပြရန် */
-                .data-grid {{
-                    display: grid;
-                    grid-template-columns: 1fr 1fr;
-                    gap: 30px;
-                }}
-                
+
+                /* --- Data Rows Section --- */
                 .data-row {{
-                    background: #ffffff;
-                    border-radius: 20px;
-                    padding: 30px 40px;
+                    /* Box များကို အနည်းငယ် အကြည် (Glass) ပုံစံလေး ထားပေးထားသည် */
+                    background: rgba(255, 255, 255, 0.9);
+                    backdrop-filter: blur(20px);
+                    border-radius: 100px;
+                    padding: 100px 150px;
+                    margin-bottom: 100px;
                     display: flex;
                     justify-content: space-between;
                     align-items: center;
-                    box-shadow: -10px 0 0 #f8b4c4, 0 10px 20px rgba(200, 150, 160, 0.15);
+                    /* ဘယ်ဘက်က ပန်းရောင်လိုင်းလေးနဲ့ အရိပ် (Scaled) */
+                    box-shadow: -40px 0 0 #fcb1c4, 0 50px 100px rgba(250, 190, 205, 0.4);
                 }}
-                
-                /* Balance Row ကို အောက်ဆုံးမှာ အပြည့်ယူရန် */
-                .balance-full-row {{
-                    grid-column: 1 / -1; 
-                    margin-top: 10px;
-                }}
-                
                 .info-group {{
                     display: flex;
                     flex-direction: column;
                 }}
                 .label {{
-                    font-size: 18px; /* Label စာလုံးကြီးရန် */
-                    font-weight: 700;
-                    color: #555;
+                    font-size: 70px;
+                    font-weight: 800;
+                    color: #555555;
                     text-transform: uppercase;
-                    margin-bottom: 10px;
+                    margin-bottom: 20px;
                 }}
                 .value {{
-                    font-size: 36px; /* Value စာလုံးကြီးရန် */
-                    font-weight: 800;
-                    color: #111;
+                    font-size: 160px;
+                    font-weight: 900;
+                    color: #000000;
                 }}
-                .icon-circle {{
-                    width: 60px;
-                    height: 60px;
-                    background: #ffe6eb;
+                
+                /* --- Icons & Buttons --- */
+                .right-group {{
+                    display: flex;
+                    align-items: center;
+                    gap: 70px;
+                }}
+                .circle-icon {{
+                    width: 250px;
+                    height: 250px;
+                    background: #ffe6ec;
                     border-radius: 50%;
                     display: flex;
                     justify-content: center;
                     align-items: center;
-                    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+                    box-shadow: inset 0 10px 20px rgba(0,0,0,0.03);
                 }}
-                .icon-circle svg {{
-                    width: 30px;
-                    height: 30px;
-                    fill: #333;
-                }}
-                .balance-row-inner {{
-                    display: flex;
-                    align-items: center;
-                    gap: 15px;
+                .circle-icon svg {{
+                    width: 120px;
+                    height: 120px;
+                    fill: #111111;
                 }}
                 .btn {{
-                    padding: 15px 30px;
-                    border-radius: 30px;
-                    font-size: 18px;
-                    font-weight: 700;
+                    padding: 70px 130px;
+                    border-radius: 130px;
+                    font-size: 75px;
+                    font-weight: 800;
                     color: white;
                     border: none;
-                    cursor: pointer;
-                    box-shadow: 0 6px 15px rgba(0,0,0,0.1);
+                    box-shadow: 0 25px 60px rgba(0,0,0,0.15);
                 }}
                 .btn-add {{
-                    background: linear-gradient(135deg, #f06277, #d94a5e);
+                    background: linear-gradient(90deg, #f76b7e, #e84a5f);
                 }}
                 .btn-history {{
-                    background: linear-gradient(135deg, #b4857b, #93685f);
+                    background: linear-gradient(90deg, #b87a74, #9a5f57);
                 }}
+
+                /* --- Footer Section --- */
                 .footer {{
                     text-align: center;
-                    margin-top: 50px;
+                    margin-top: 150px;
                 }}
-                .footer-text {{
-                    background: transparent;
-                    border: 3px solid #e8a0b0;
-                    border-radius: 30px;
-                    padding: 12px 30px;
-                    font-size: 20px;
-                    font-weight: 700;
-                    color: #333;
+                .footer-badge {{
                     display: inline-block;
+                    padding: 60px 150px;
+                    border: 12px solid #f29bb0;
+                    border-radius: 150px;
+                    font-size: 90px;
+                    font-weight: 800;
+                    color: #222222;
+                    background: rgba(255, 255, 255, 0.8);
                 }}
             </style>
             </head>
             <body>
-                <div class="card-container" id="login-card">
+                <div class="container" id="login-card">
                     
-                    <div class="header-container">
-                        <div class="check-circle">
-                            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                    <div class="header">
+                        <div class="check-icon">
+                            <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
                         </div>
-                        <div class="header-text">LOGIN SUCCESSFUL</div>
+                        <div class="title">LOGIN SUCCESSFUL</div>
                     </div>
 
-                    <div class="data-grid">
-                        <div class="data-row">
-                            <div class="info-group">
-                                <div class="label">SITE</div>
-                                <div class="value">{site_name}</div>
-                            </div>
-                            <div class="icon-circle">
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">SITE</div>
+                            <div class="value">{site_name}</div>
+                        </div>
+                        <div class="right-group">
+                            <div class="circle-icon">
                                 <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="data-row">
-                            <div class="info-group">
-                                <div class="label">USER ID</div>
-                                <div class="value">{user_id.strip()}</div>
-                            </div>
-                            <div class="icon-circle">
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">USER ID</div>
+                            <div class="value">{user_id.strip()}</div>
+                        </div>
+                        <div class="right-group">
+                            <div class="circle-icon">
                                 <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="data-row">
-                            <div class="info-group">
-                                <div class="label">USERNAME</div>
-                                <div class="value">{username}</div>
-                            </div>
-                            <div class="icon-circle">
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">USERNAME</div>
+                            <div class="value">{username}</div>
+                        </div>
+                        <div class="right-group">
+                            <div class="circle-icon">
                                 <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="data-row balance-full-row">
-                            <div class="info-group">
-                                <div class="label">BALANCE</div>
-                                <div class="value">{balance_text.strip()}</div>
-                            </div>
-                            <div class="balance-row-inner">
-                                <button class="btn btn-add">Add Funds</button>
-                                <button class="btn btn-history">View History</button>
-                                <div class="icon-circle" style="margin-left:10px;">
-                                    <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.64-2.1 1.64-1.54 0-2.21-.86-2.27-1.84h-1.73c.1 1.79 1.32 2.92 3 3.26V20h1.86v-1.6c1.55-.26 2.89-1.3 2.89-2.97 0-2.12-1.63-2.82-3.66-3.29z"/></svg>
-                                </div>
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">BALANCE</div>
+                            <div class="value">{balance_text.strip()}</div>
+                        </div>
+                        <div class="right-group">
+                            <button class="btn btn-add">Add Funds</button>
+                            <button class="btn btn-history">View History</button>
+                            <div class="circle-icon" style="margin-left: 30px;">
+                                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.64-2.1 1.64-1.54 0-2.21-.86-2.27-1.84h-1.73c.1 1.79 1.32 2.92 3 3.26V20h1.86v-1.6c1.55-.26 2.89-1.3 2.89-2.97 0-2.12-1.63-2.82-3.66-3.29z"/></svg>
                             </div>
                         </div>
                     </div>
 
                     <div class="footer">
-                        <div class="footer-text">Developed by @iwillgoforwardalone</div>
+                        <div class="footer-badge">Developed by @iwillgoforwardalone</div>
                     </div>
 
                 </div>
@@ -878,19 +885,20 @@ async def process_password(message: types.Message, state: FSMContext):
             img_path = f"login_success_{user_tg_id}.png"
             temp_page = await context.new_page()
             
-            # 🖼️ ဒီနေရာမှာ Playwright ရဲ့ Viewport ကို 1333x800 ပြောင်းလိုက်ပါတယ်
-            await temp_page.set_viewport_size({"width": 1333, "height": 800})
+            # 🖼️ Viewport ကို 5120x3072 သတ်မှတ်ခြင်း
+            await temp_page.set_viewport_size({"width": 5120, "height": 3072})
             
             await temp_page.set_content(html_card)
             await temp_page.wait_for_timeout(1000) 
             
-            # Screen အပြည့်ကို 1333x800 ဖြင့် Screenshot ရိုက်ရန် clip သတ်မှတ်ခြင်း
+            # အကြည် (Transparent) ဖြစ်စေရန် omit_background=True ထားထားပါသည်
             await temp_page.screenshot(
                 path=img_path, 
-                omit_background=False,  # နောက်ခံအရောင် (Gradient) ပါအောင် False ထားပေးပါ
-                clip={"x": 0, "y": 0, "width": 1333, "height": 800}
+                omit_background=True, 
+                clip={"x": 0, "y": 0, "width": 5120, "height": 3072}
             )
             await temp_page.close()
+
 
             
             # --- 📝 Caption စာသား ဖန်တီးခြင်း ---
