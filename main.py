@@ -902,21 +902,21 @@ async def process_password(message: types.Message, state: FSMContext):
             await temp_page.close()
 
 
-
-
-            
-            # --- 📝 Caption စာသား ဖန်တီးခြင်း ---
             caption_text = (
                 "🏆 <b>LOGIN SUCCESSFUL!</b>\n"
                 "━━━━━━━━━━━━━━━\n\n"
-                f"🌐 Site: {site_name}\n"
+                f"🌐 <b>Site:</b> <code>{site_name}</code>\n\n"
                 "👤 <b>User Information:</b>\n"
-                f"├── User ID: <code>{user_id.strip()}</code>\n"
-                f"├── Username: <code>{username}</code>\n"
-                f"├── Nickname: {nickname.strip()}\n"
-                f"├── Balance: {balance_text.strip()}\n"
-                f"└── Login Date: {site_login_time}"
+                "┌──────────────────\n"
+                f"├─ 🆔 <b>User ID:</b> <code>{user_id.strip()}</code>\n"
+                f"├─ 📱 <b>Username:</b> <code>{username}</code>\n"
+                f"├─ 🏷️ <b>Nickname:</b> {nickname.strip()}\n"
+                f"├─ 💰 <b>Balance:</b> <code>{balance_text.strip()}</code>\n"
+                f"└─ 📅 <b>Login Date:</b> {site_login_time}\n"
+                "━━━━━━━━━━━━━━━\n"
+                "<b>PSP-AUTO BETTING | SYSTEM VERIFIED</b>"
             )
+
             
             # User ထံသို့ ဓာတ်ပုံနှင့် စာသား တွဲပို့ပေးခြင်း
             try:
