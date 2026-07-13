@@ -1,3 +1,4 @@
+#app.py
 import asyncio
 import os
 import html
@@ -26,6 +27,7 @@ from playwright.async_api import async_playwright
 # Database နှင့် AI ကို ချိတ်ဆက်ခြင်း
 import database as db 
 import ai_engines
+from ai_engines import AI_MODES, AI_MODE_EMOJIS
 
 # ==========================================================
 # ⚙️ Configuration
@@ -274,16 +276,27 @@ class LoginForm(StatesGroup):
 def get_main_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [E_LOGIN], 
-            [E_GAMES]
+            [E_LOGIN]
         ],
         resize_keyboard=True
     )
 
+# ==========================================================
+# ⌨️ Site Selection Keyboard with Colors
+# ==========================================================
 def get_site_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text="𝟳𝟳𝟳𝗕𝗜𝗚𝗪𝗜𝗡"), KeyboardButton(text="𝗦𝗜𝗫 𝗟𝗢𝗧𝗧𝗘𝗥𝗬")], 
+            [
+                KeyboardButton(
+                    text="𝟳𝟳𝟳𝗕𝗜𝗚𝗪𝗜𝗡",
+                    style="success"  # 🟢 Green
+                ),
+                KeyboardButton(
+                    text="𝗦𝗜𝗫 𝗟𝗢𝗧𝗧𝗘𝗥𝗬",
+                    style="danger"  # 🔴 Red
+                )
+            ],
             [E_BACK]
         ],
         resize_keyboard=True
@@ -303,17 +316,34 @@ def get_logged_in_keyboard():
     )
 
 def get_ai_mode_keyboard():
-    modes = list(ai_engines.AI_MODES.values())
+    modes = list(AI_MODES.values())
     keyboard = []
     row = []
+    
     for mode in modes:
-        row.append(KeyboardButton(text=mode["name"]))
+        mode_name = mode["name"]
+        emoji_id = AI_MODE_EMOJIS.get(mode_name, "5868656545634689320")
+        
+        btn = KeyboardButton(
+            text=mode_name,
+            icon_custom_emoji_id=emoji_id,
+            style="primary"  # 🔵 Blue color
+        )
+        row.append(btn)
         if len(row) == 2:
             keyboard.append(row)
             row = []
-    if row: 
+    if row:
         keyboard.append(row)
-    keyboard.append([KeyboardButton(text="🔙 ပင်မမီနူးသို့")])
+    
+    # Back button with premium emoji and style
+    back_btn = KeyboardButton(
+        text="🔙 ပင်မမီနူးသို့",
+        icon_custom_emoji_id="5848119413041431362",
+        style="primary"
+    )
+    keyboard.append([back_btn])
+    
     return ReplyKeyboardMarkup(keyboard=keyboard, resize_keyboard=True)
 
 def get_hit_betting_inline_keyboard(current_wait: int = 0):
@@ -472,6 +502,7 @@ async def process_phone(message: types.Message, state: FSMContext):
     await state.set_state(LoginForm.enter_password)
     await message.answer("ᴘʟᴇᴀꜱᴇ ᴇɴᴛᴇʀ ʏᴏᴜʀ ᴘᴀꜱꜱᴡᴏʀᴅ", reply_markup=ReplyKeyboardRemove())
 
+# ==========================================================
 # 🔥 Playwright Logic: Login & Database Save
 # ==========================================================
 @dp.message(LoginForm.enter_password)
@@ -491,6 +522,7 @@ async def process_password(message: types.Message, state: FSMContext):
         main_url = "https://www.777bigwingame.app/#/main"
         game_url = "https://www.777bigwingame.app/#/home/AllLotteryGames/WinGo?id=1"
 
+    # 📊 Progress Bar Update လုပ်ပေးမည့် Helper Function
     async def update_progress(msg: types.Message, pct: int):
         filled = pct // 10
         empty = 10 - filled
@@ -500,6 +532,7 @@ async def process_password(message: types.Message, state: FSMContext):
         except Exception:
             pass
 
+    # Initial Loading State 0%
     loading_msg = await message.answer("□□□□□□□□□□ Logging in... 0%")
     
     # 10% - Browser စတင်ဖွင့်ခြင်း
@@ -512,16 +545,15 @@ async def process_password(message: types.Message, state: FSMContext):
         is_mobile=True
     )
     page = await context.new_page()
-
+    
     try:
-        # 30% - Login စာမျက်နှာသို့ သွားခြင်း (load ဖြစ်သည်အထိစောင့်မည်)
+        # 30% - Login စာမျက်နှာသို့ သွားခြင်း
         await update_progress(loading_msg, 30)
-        await page.goto(login_url, wait_until="load", timeout=30000)
-        
-        # 50% - ဖုန်းနံပါတ် Input ပေါ်လာတာကို သေချာစောင့်မည်
+        await page.goto(login_url, wait_until="networkidle", timeout=60000)
+        await page.wait_for_timeout(3000)
+
+        # 50% - ဖုန်းနံပါတ်နှင့် စကားဝှက် ရိုက်ထည့်ခြင်း
         await update_progress(loading_msg, 50)
-        await page.wait_for_selector('input[name="userNumber"]', timeout=10000)
-        
         js_code = """
         ([user, pwd]) => {
             function fillVueInput(element, value) {
@@ -542,25 +574,19 @@ async def process_password(message: types.Message, state: FSMContext):
         }
         """
         await page.evaluate(js_code, [username, password])
-        await page.wait_for_timeout(500) # Input ထည့်ပြီး ချက်ချင်းမနှိပ်ဘဲ ခဏစောင့်မည်
+        await page.wait_for_timeout(1000)
         
         # 70% - Login ခလုတ်နှိပ်ခြင်း
         await update_progress(loading_msg, 70)
         await page.evaluate("() => { let btn = document.querySelector('button.active'); if (btn) btn.click(); }")
+        await page.wait_for_timeout(5000)
         
-        # 🚀 Login အောင်မြင်ကြောင်းသိရန် URL ပြောင်းသွားတာကို စောင့်မည်
         try:
-            await page.wait_for_url("**/main**", timeout=8000)
-        except Exception:
-            await page.wait_for_timeout(3000) # ချက်ချင်းမပြောင်းရင် နည်းနည်းထပ်စောင့်မည်
-
-        # ကြော်ငြာ Dialog များကို ပိတ်မည်
-        try:
-            for _ in range(2):
+            for _ in range(3):
                 btn = await page.query_selector(".announcement-dialog__button")
                 if btn:
                     await btn.click()
-                    await page.wait_for_timeout(500)
+                    await page.wait_for_timeout(1000)
                 else:
                     break
         except Exception: 
@@ -569,28 +595,33 @@ async def process_password(message: types.Message, state: FSMContext):
         if "login" not in page.url.lower():
             # 85% - Main စာမျက်နှာသို့သွား၍ အချက်အလက်များယူခြင်း
             await update_progress(loading_msg, 85)
-            await page.goto(main_url, wait_until="load")
+            try:
+                await page.goto(main_url, wait_until="networkidle")
+                await page.wait_for_timeout(3000)
+            except Exception: 
+                pass
 
             user_id = "N/A"
             nickname = "Unknown"
             balance_text = "0.00 Ks"
             site_login_time = get_myanmar_time().strftime("%Y-%m-%d %H:%M:%S")
 
-            # Element တွေ ပေါ်လာတာကို စောင့်ပြီးမှ ယူမည်
             try:
-                await page.wait_for_selector('.userInfo__container-content-nickname h3', timeout=5000)
                 nick_el = page.locator('.userInfo__container-content-nickname h3').first
-                nickname = await nick_el.inner_text()
+                if await nick_el.is_visible(timeout=3000): 
+                    nickname = await nick_el.inner_text()
                 
                 uid_el = page.locator('.userInfo__container-content-uid span:nth-child(3)').first
-                user_id = await uid_el.inner_text()
-                
+                if await uid_el.is_visible(timeout=2000): 
+                    user_id = await uid_el.inner_text()
+                    
                 balance_el = page.locator('.balance_info p.totalSavings__container-header__subtitle span').first
-                balance_text = await balance_el.inner_text()
+                if await balance_el.is_visible(timeout=2000): 
+                    balance_text = await balance_el.inner_text()
             except Exception: 
                 pass
 
-            await page.goto(game_url, wait_until="load")
+            await page.goto(game_url, wait_until="networkidle")
             await page.wait_for_timeout(2000)
 
             db_user = await db.get_user(user_tg_id)
@@ -635,7 +666,234 @@ async def process_password(message: types.Message, state: FSMContext):
             await update_progress(loading_msg, 100)
             await asyncio.sleep(0.5) 
             
-            await message.answer(f"𝗟𝗢𝗚𝗜𝗡 𝗦𝗨𝗖𝗖𝗘𝗦𝗦 ({site_name})", reply_markup=get_logged_in_keyboard())
+            # --- 🎨 Generate Custom Image using Playwright (Advanced Design) ---
+            html_card = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <meta charset="UTF-8">
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800&display=swap');
+                
+                body {{
+                    background: linear-gradient(135deg, #fff0f5 0%, #ffe4e1 100%);
+                    font-family: 'Montserrat', sans-serif;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    height: 100vh;
+                    margin: 0;
+                }}
+                .card-container {{
+                    padding: 20px;
+                    width: 450px;
+                }}
+                .header-container {{
+                    display: flex;
+                    align-items: center;
+                    margin-bottom: 25px;
+                }}
+                .check-circle {{
+                    width: 70px;
+                    height: 70px;
+                    background: #ffffff;
+                    border-radius: 50%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    box-shadow: 0 10px 20px rgba(255, 182, 193, 0.4), inset 0 -4px 10px rgba(0,0,0,0.05);
+                    margin-right: 20px;
+                }}
+                .check-circle svg {{
+                    width: 40px;
+                    height: 40px;
+                    fill: #ef8b9e;
+                }}
+                .header-text {{
+                    font-size: 26px;
+                    font-weight: 800;
+                    color: #333;
+                    letter-spacing: 1px;
+                }}
+                .data-row {{
+                    background: #ffffff;
+                    border-radius: 16px;
+                    padding: 15px 20px;
+                    margin-bottom: 15px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    box-shadow: -8px 0 0 #f8b4c4, 0 8px 15px rgba(200, 150, 160, 0.15);
+                    position: relative;
+                }}
+                .info-group {{
+                    display: flex;
+                    flex-direction: column;
+                }}
+                .label {{
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: #333;
+                    text-transform: uppercase;
+                    margin-bottom: 5px;
+                }}
+                .value {{
+                    font-size: 22px;
+                    font-weight: 800;
+                    color: #111;
+                }}
+                .icon-circle {{
+                    width: 38px;
+                    height: 38px;
+                    background: #ffe6eb;
+                    border-radius: 50%;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
+                }}
+                .icon-circle svg {{
+                    width: 20px;
+                    height: 20px;
+                    fill: #333;
+                }}
+                .balance-row {{
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                }}
+                .btn {{
+                    padding: 8px 15px;
+                    border-radius: 20px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: white;
+                    border: none;
+                    cursor: pointer;
+                    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+                }}
+                .btn-add {{
+                    background: linear-gradient(135deg, #f06277, #d94a5e);
+                }}
+                .btn-history {{
+                    background: linear-gradient(135deg, #b4857b, #93685f);
+                }}
+                .footer {{
+                    text-align: center;
+                    margin-top: 25px;
+                }}
+                .footer-text {{
+                    background: transparent;
+                    border: 2px solid #e8a0b0;
+                    border-radius: 20px;
+                    padding: 8px 20px;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #333;
+                    display: inline-block;
+                }}
+            </style>
+            </head>
+            <body>
+                <div class="card-container" id="login-card">
+                    
+                    <div class="header-container">
+                        <div class="check-circle">
+                            <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                        </div>
+                        <div class="header-text">LOGIN SUCCESSFUL</div>
+                    </div>
+
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">SITE</div>
+                            <div class="value">{site_name}</div>
+                        </div>
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24"><path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/></svg>
+                        </div>
+                    </div>
+
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">USER ID</div>
+                            <div class="value">{user_id.strip()}</div>
+                        </div>
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+                        </div>
+                    </div>
+
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">USERNAME</div>
+                            <div class="value">{username}</div>
+                        </div>
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                        </div>
+                    </div>
+
+                    <div class="data-row">
+                        <div class="info-group">
+                            <div class="label">BALANCE</div>
+                            <div class="value">{balance_text.strip()}</div>
+                        </div>
+                        <div class="balance-row">
+                            <button class="btn btn-add">Add Funds</button>
+                            <button class="btn btn-history">View History</button>
+                            <div class="icon-circle" style="margin-left:5px;">
+                                <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.43 2.1-1.43 1.38 0 1.9.66 1.94 1.64h1.71c-.05-1.34-.87-2.57-2.49-2.97V5H10.9v1.69c-1.51.32-2.72 1.3-2.72 2.81 0 1.79 1.49 2.69 3.66 3.21 1.95.46 2.34 1.15 2.34 1.87 0 .53-.39 1.64-2.1 1.64-1.54 0-2.21-.86-2.27-1.84h-1.73c.1 1.79 1.32 2.92 3 3.26V20h1.86v-1.6c1.55-.26 2.89-1.3 2.89-2.97 0-2.12-1.63-2.82-3.66-3.29z"/></svg>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="footer">
+                        <div class="footer-text">Developed by @iwillgoforwardalone</div>
+                    </div>
+
+                </div>
+            </body>
+            </html>
+            """
+            
+            img_path = f"login_success_{user_tg_id}.png"
+            temp_page = await context.new_page()
+            await temp_page.set_viewport_size({"width": 600, "height": 800})
+            await temp_page.set_content(html_card)
+            await temp_page.wait_for_timeout(1000) 
+            await temp_page.locator("#login-card").screenshot(path=img_path, omit_background=True)
+            await temp_page.close()
+            
+            # --- 📝 Caption စာသား ဖန်တီးခြင်း ---
+            caption_text = (
+                "🏆 <b>LOGIN SUCCESSFUL!</b>\n"
+                "━━━━━━━━━━━━━━━\n\n"
+                f"🌐 Site: {site_name}\n"
+                "👤 <b>User Information:</b>\n"
+                f"├── User ID: <code>{user_id.strip()}</code>\n"
+                f"├── Username: <code>{username}</code>\n"
+                f"├── Nickname: {nickname.strip()}\n"
+                f"├── Balance: {balance_text.strip()}\n"
+                f"└── Login Date: {site_login_time}"
+            )
+            
+            # User ထံသို့ ဓာတ်ပုံနှင့် စာသား တွဲပို့ပေးခြင်း
+            try:
+                photo = FSInputFile(img_path)
+                await message.answer_photo(
+                    photo=photo, 
+                    caption=caption_text, 
+                    reply_markup=get_logged_in_keyboard()
+                )
+            except Exception as e:
+                # ပုံပို့ရာတွင် အဆင်မပြေပါက စာသားသက်သက်သာ ပို့ပေးမည်
+                await message.answer(caption_text, reply_markup=get_logged_in_keyboard())
+            finally:
+                # အသုံးပြုပြီးသော ဓာတ်ပုံဖိုင်ကို ဖျက်ပစ်မည်
+                if os.path.exists(img_path):
+                    os.remove(img_path)
+
             await state.set_state(LoginForm.main_menu)
             
         else:
